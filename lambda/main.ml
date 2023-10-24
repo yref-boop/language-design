@@ -8,7 +8,7 @@ open Parser;;
 open Lexer;;
 
 let clean s = match s with
-    | '\n' -> ''
+    | '\n' -> ' '
     | x -> x
 ;;
 

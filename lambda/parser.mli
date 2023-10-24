@@ -9,6 +9,7 @@ type token =
   | PRED
   | ISZERO
   | LET
+  | LETREC
   | IN
   | BOOL
   | NAT
