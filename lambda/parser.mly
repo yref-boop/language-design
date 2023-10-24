@@ -59,6 +59,8 @@ appTerm :
       { TmPred $2 }
   | ISZERO atomicTerm
       { TmIsZero $2 }
+  | FIX atomicTerm
+      { TmFix $2 }
   | appTerm atomicTerm
       { TmApp ($1, $2) }
 
