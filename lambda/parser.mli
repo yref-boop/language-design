@@ -13,6 +13,7 @@ type token =
   | IN
   | BOOL
   | NAT
+  | FIX
   | LPAREN
   | RPAREN
   | DOT

@@ -17,7 +17,7 @@
 %token IN
 %token BOOL
 %token NAT
-
+%token FIX
 %token LPAREN
 %token RPAREN
 %token DOT
