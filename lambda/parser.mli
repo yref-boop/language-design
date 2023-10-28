@@ -11,8 +11,10 @@ type token =
   | LET
   | LETREC
   | IN
+  | CONCAT
   | BOOL
   | NAT
+  | STRING
   | FIX
   | LPAREN
   | RPAREN
@@ -23,6 +25,7 @@ type token =
   | EOF
   | INTV of (int)
   | IDV of (string)
+  | STRINGV of (string)
 
 val s :
   (Lexing.lexbuf  -> token) -> Lexing.lexbuf -> Lambda.term
