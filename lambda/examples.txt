@@ -37,6 +37,14 @@ letrec fact: Nat -> Nat -> Nat =
     else prod n (fact n (pred m))
 in fact 2 6;
 
+
+
+letrec sum: Nat -> Nat -> Nat =
+    lambda n : Nat. lambda m : Nat. 
+    if iszero n then m 
+    else succ (sum (pred n) m) 
+in
+
 letrec fib: Nat -> Nat = 
     lambda n : Nat.
     if iszero n then 0 
@@ -44,6 +52,4 @@ letrec fib: Nat -> Nat =
     	if iszero (pred n) then 1
 	else sum (fib (pred n)) (fib (pred (pred n)))
 in fib 5;
-
-
 
