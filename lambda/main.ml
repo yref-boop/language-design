@@ -39,6 +39,8 @@ let top_level_loop () =
      | Type_error e ->
          print_endline ("type error: " ^ e);
          loop ctx
+     | End_of_file ->
+         print_endline("closing...");
   in
     loop emptyctx
   ;;
