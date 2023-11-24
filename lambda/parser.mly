@@ -38,7 +38,7 @@
 %%
 
 s :
-    STRINGV EQ term EOF
+    IDV EQ term EOF
       { Bind ($1, $3) }
   | term EOF
       { Eval $1 }
