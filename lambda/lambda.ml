@@ -173,7 +173,7 @@ let rec typeof ctx tm = match tm with
     TyChar
 
   | TmFirst t ->
-    if typeof ctx t = TyString then TyString
+    if typeof ctx t = TyString then TyChar
     else raise (Type_error "argument of concat is not a string")
 
   | TmSub t ->
@@ -470,8 +470,8 @@ let rec eval ctx tm =
 
 let execute ctx = function
     Eval tm ->
+      let tyTm = typeof ctx tm in
       let tm' = eval ctx tm in
-      let tyTm = typeof ctx tm' in
       print_endline ("- : " ^ string_of_ty tyTm ^ " = " ^ string_of_term tm');
       ctx
   | Bind (s, tm) ->
