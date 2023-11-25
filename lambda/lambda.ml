@@ -6,6 +6,7 @@ type ty =
   | TyNat
   | TyArr of ty * ty
   | TyString
+  | TyChar
 ;;
 
 
@@ -24,6 +25,8 @@ type term =
   | TmFix of term
   | TmString of string
   | TmConcat of term * term
+  | TmChar of char
+  | TmFirst of term
 ;;
 
 type command =
@@ -77,6 +80,8 @@ let rec string_of_ty ty = match ty with
       "(" ^ string_of_ty ty1 ^ ")" ^ " -> " ^ "(" ^ string_of_ty ty2 ^ ")"
   | TyString ->
       "String"
+  | TyChar ->
+      "Char"
 ;;
 
 exception Type_error of string
@@ -163,6 +168,13 @@ let rec typeof ctx tm = match tm with
     if typeof ctx t1 = TyString && typeof ctx t2 = TyString then TyString
     else raise (Type_error "argument of concat is not a string")
 
+  | TmChar t ->
+    TyChar
+
+  | TmFirst t ->
+    if typeof ctx t = TyString then TyString
+    else raise (Type_error "argument of concat is not a string")
+
 ;;
 
 
@@ -203,6 +215,10 @@ let rec string_of_term = function
     "\"" ^ s ^ "\""
   | TmConcat (t1, t2) ->
     "concat " ^ "(" ^ string_of_term t1 ^ ")" ^ " " ^ "(" ^ string_of_term t2 ^ ")"
+  | TmChar c ->
+    "\'" ^ String.make 1 c ^ "\'"
+  | TmFirst t ->
+    "first " ^ "(" ^ "\"" ^ string_of_term t ^ "\"" ^ ")"
 ;;
 
 let rec ldif l1 l2 = match l1 with
@@ -244,6 +260,10 @@ let rec free_vars tm = match tm with
       []
   | TmConcat (t1, t2) ->
       lunion (free_vars t1) (free_vars t2)
+  | TmChar _ ->
+      []
+  | TmFirst t ->
+      free_vars t
 ;;
 
 let rec fresh_name x l =
@@ -289,6 +309,10 @@ let rec subst x s tm = match tm with
       TmString st
   | TmConcat (t1, t2) ->
       TmConcat (subst x s t1, subst x s t2)
+  | TmChar c ->
+      TmChar c
+  | TmFirst t ->
+      TmFirst (subst x s t)
 ;;
 
 let rec isnumericval tm = match tm with
@@ -302,6 +326,7 @@ let rec isval tm = match tm with
   | TmFalse -> true
   | TmAbs _ -> true
   | TmString _ -> true
+  | TmChar _ -> true
   | t when isnumericval t -> true
   | _ -> false
 ;;
@@ -397,6 +422,13 @@ let rec eval1 ctx tm = match tm with
   | TmConcat (t1, t2) ->
       let t1' = eval1 ctx t1 in
       TmConcat (t1', t2)
+
+  | TmFirst (TmString s) ->
+      TmChar (s.[0])
+
+  | TmFirst s ->
+      let s' = eval1 ctx s in
+      TmFirst s'
 
       (* var rule *)
   | TmVar s ->

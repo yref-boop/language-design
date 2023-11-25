@@ -4,6 +4,7 @@ type ty =
   | TyNat
   | TyArr of ty * ty
   | TyString
+  | TyChar
 ;;
 
 type term =
@@ -21,6 +22,8 @@ type term =
   | TmFix of term
   | TmString of string
   | TmConcat of term * term
+  | TmChar of char
+  | TmFirst of term
 ;;
 
 type binding =

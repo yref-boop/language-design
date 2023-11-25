@@ -21,9 +21,11 @@ rule token = parse
   | "fix"       { FIX }
   | "in"        { IN }
   | "concat"    { CONCAT }
+  | "first"       { FIRST }
   | "Bool"      { BOOL }
   | "Nat"       { NAT }
   | "String"    { STRING }
+  | "Char"      { CHAR }
   | '('         { LPAREN }
   | ')'         { RPAREN }
   | '.'         { DOT }
@@ -36,6 +38,9 @@ rule token = parse
   | '"'[^'"' ';' '\n']*'"'
                 { let s = Lexing.lexeme lexbuf in
                   STRINGV (String.sub s 1 (String.length s - 2)) }
+  | ''' [^';' ''' '"' '\n'] '''   
+                { let c = Lexing.lexeme lexbuf in
+                        CHARV (c.[1])}
   | eof         { EOF }
   | _           { raise Lexical_error }
 
