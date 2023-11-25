@@ -24,6 +24,7 @@ type term =
   | TmConcat of term * term
   | TmChar of char
   | TmFirst of term
+  | TmSub of term
 ;;
 
 type binding =

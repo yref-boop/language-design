@@ -27,6 +27,7 @@ type term =
   | TmConcat of term * term
   | TmChar of char
   | TmFirst of term
+  | TmSub of term
 ;;
 
 type command =
@@ -175,6 +176,10 @@ let rec typeof ctx tm = match tm with
     if typeof ctx t = TyString then TyString
     else raise (Type_error "argument of concat is not a string")
 
+  | TmSub t ->
+    if typeof ctx t = TyString then TyString
+    else raise (Type_error "argument of sub is not a string")
+
 ;;
 
 
@@ -219,6 +224,8 @@ let rec string_of_term = function
     "\'" ^ String.make 1 c ^ "\'"
   | TmFirst t ->
     "first " ^ "(" ^ "\"" ^ string_of_term t ^ "\"" ^ ")"
+  | TmSub t ->
+    "sub " ^ "(" ^ "\"" ^ string_of_term t ^ "\"" ^ ")"
 ;;
 
 let rec ldif l1 l2 = match l1 with
@@ -263,6 +270,8 @@ let rec free_vars tm = match tm with
   | TmChar _ ->
       []
   | TmFirst t ->
+      free_vars t
+  | TmSub t ->
       free_vars t
 ;;
 
@@ -313,6 +322,8 @@ let rec subst x s tm = match tm with
       TmChar c
   | TmFirst t ->
       TmFirst (subst x s t)
+  | TmSub t ->
+      TmSub (subst x s t)
 ;;
 
 let rec isnumericval tm = match tm with
@@ -429,6 +440,16 @@ let rec eval1 ctx tm = match tm with
   | TmFirst s ->
       let s' = eval1 ctx s in
       TmFirst s'
+
+  | TmSub (TmString s) ->
+      let str =
+          if s = "" then "" else
+          String.sub s 1 ((String.length s) - 1)
+      in TmString str
+
+  | TmSub s ->
+      let s' = eval1 ctx s in
+      TmSub s'
 
       (* var rule *)
   | TmVar s ->

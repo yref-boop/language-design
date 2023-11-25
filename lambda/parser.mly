@@ -17,6 +17,7 @@
 %token IN
 %token CONCAT
 %token FIRST
+%token SUB
 %token BOOL
 %token NAT
 %token STRING
@@ -72,7 +73,9 @@ appTerm :
   | FIX atomicTerm
       { TmFix $2 }
   | FIRST atomicTerm
-      { TmFirst ($2)}
+      { TmFirst $2 }
+  | SUB atomicTerm
+      { TmSub $2 }
   | appTerm atomicTerm
       { TmApp ($1, $2) }
 
@@ -112,4 +115,3 @@ atomicTy :
       { TyString }
   | CHAR
       { TyChar }
-

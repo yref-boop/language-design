@@ -21,11 +21,12 @@ rule token = parse
   | "fix"       { FIX }
   | "in"        { IN }
   | "concat"    { CONCAT }
-  | "first"       { FIRST }
+  | "first"     { FIRST }
   | "Bool"      { BOOL }
   | "Nat"       { NAT }
   | "String"    { STRING }
   | "Char"      { CHAR }
+  | "sub"       { SUB }
   | '('         { LPAREN }
   | ')'         { RPAREN }
   | '.'         { DOT }
@@ -43,4 +44,3 @@ rule token = parse
                         CHARV (c.[1])}
   | eof         { EOF }
   | _           { raise Lexical_error }
-
