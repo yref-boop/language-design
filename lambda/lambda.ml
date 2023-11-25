@@ -424,7 +424,7 @@ let rec eval1 ctx tm = match tm with
       TmConcat (t1', t2)
 
   | TmFirst (TmString s) ->
-      TmChar (s.[0])
+      TmChar s.[0]
 
   | TmFirst s ->
       let s' = eval1 ctx s in
@@ -449,8 +449,8 @@ let rec eval ctx tm =
 
 let execute ctx = function
     Eval tm ->
-      let tyTm = typeof ctx tm in
       let tm' = eval ctx tm in
+      let tyTm = typeof ctx tm' in
       print_endline ("- : " ^ string_of_ty tyTm ^ " = " ^ string_of_term tm');
       ctx
   | Bind (s, tm) ->
