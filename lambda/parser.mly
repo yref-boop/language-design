@@ -33,6 +33,7 @@
 
 %token <int> INTV
 %token <string> IDV
+%token <string> IDT
 %token <string> STRINGV
 %token <char> CHARV
 
@@ -44,6 +45,8 @@
 s :
     IDV EQ term EOF
       { Bind ($1, $3) }
+  | IDT EQ ty EOF
+      { Bind ($1, $3)}
   | term EOF
       { Eval $1 }
 
@@ -88,6 +91,8 @@ atomicTerm :
       { TmFalse }
   | IDV
       { TmVar $1 }
+  | IDT
+      { TmType $1 }
   | INTV
       { let rec f = function
             0 -> TmZero

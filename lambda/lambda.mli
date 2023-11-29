@@ -16,6 +16,7 @@ type term =
   | TmPred of term
   | TmIsZero of term
   | TmVar of string
+  | TmType of string
   | TmAbs of string * ty * term
   | TmApp of term * term
   | TmLetIn of string * term * term
@@ -31,9 +32,11 @@ type binding =
     TyBind of ty
     | TyTmBind of (ty * term)
 ;;
+
 type context =
     ( string * binding ) list
 ;;
+
 type command =
     Eval of term
     | Bind of string * term
@@ -51,6 +54,6 @@ val typeof : context -> term -> ty;;
 
 val string_of_term : term -> string;;
 exception NoRuleApplies;;
-val eval : context -> term -> term;;
-val execute : context -> command -> context;;
+val eval : context -> context -> term -> term;;
+val execute : context -> context -> command -> context;;
 

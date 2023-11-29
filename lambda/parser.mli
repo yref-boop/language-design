@@ -13,6 +13,7 @@ type token =
   | IN
   | CONCAT
   | FIRST
+  | SUB
   | BOOL
   | NAT
   | STRING
@@ -27,6 +28,7 @@ type token =
   | EOF
   | INTV of (int)
   | IDV of (string)
+  | IDT of (string)
   | STRINGV of (string)
   | CHARV of (char)
 

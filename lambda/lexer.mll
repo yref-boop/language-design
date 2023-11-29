@@ -34,6 +34,8 @@ rule token = parse
   | ':'         { COLON }
   | "->"        { ARROW }
   | ['0'-'9']+  { INTV (int_of_string (Lexing.lexeme lexbuf)) }
+  | ['A'-'Z']['a'-'z' '_' '0'-'9']*
+                { IDV (Lexing.lexeme lexbuf) }
   | ['a'-'z']['a'-'z' '_' '0'-'9']*
                 { IDV (Lexing.lexeme lexbuf) }
   | '"'[^'"' ';' '\n']*'"'
