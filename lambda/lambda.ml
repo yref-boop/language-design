@@ -19,7 +19,6 @@ type term =
   | TmPred of term
   | TmIsZero of term
   | TmVar of string
-  | TmType of string
   | TmAbs of string * ty * term
   | TmApp of term * term
   | TmLetIn of string * term * term
@@ -89,9 +88,6 @@ let rec string_of_ty ty = match ty with
 exception Type_error of string
 ;;
 
-exception NoRuleApplies
-;;
-
 let rec typeof ctx tm = match tm with
     (* T-True *)
     TmTrue ->
@@ -133,11 +129,6 @@ let rec typeof ctx tm = match tm with
   | TmVar x ->
       (try gettbinding ctx x with
        _ -> raise (Type_error ("no binding type for variable " ^ x)))
-
-     (* T-Type *)
-  | TmType t ->
-      (try gettbinding ctx t with
-      _ -> raise (Type_error ("ta mal todo para "^t)))
 
     (* T-Abs *)
   | TmAbs (x, tyT1, t2) ->
@@ -189,19 +180,7 @@ let rec typeof ctx tm = match tm with
     if typeof ctx t = TyString then TyString
     else raise (Type_error "argument of sub is not a string")
 
-  | _ ->
-      raise NoRuleApplies
 ;;
-
-let rec typeoftype ctx ty =
-  try
-    let ty' = typeof ctx ty in
-    ty'
-  with
-    NoRuleApplies ->
-        List.fold_left (fun t x -> subst x (gettbinding ctx x) t) ty (free_vars tm)
-;;
-     
 
 
 (* TERMS MANAGEMENT (EVALUATION) *)
@@ -229,8 +208,6 @@ let rec string_of_term = function
       "iszero " ^ "(" ^ string_of_term t ^ ")"
   | TmVar s ->
       s
-  | TmType t ->
-      t
   | TmAbs (s, tyS, t) ->
       "(lambda " ^ s ^ ":" ^ string_of_ty tyS ^ ". " ^ string_of_term t ^ ")"
   | TmApp (t1, t2) ->
@@ -278,8 +255,6 @@ let rec free_vars tm = match tm with
       free_vars t
   | TmVar s ->
       [s]
-  | TmType t ->
-      [t]
   | TmAbs (s, _, t) ->
       ldif (free_vars t) [s]
   | TmApp (t1, t2) ->
@@ -321,8 +296,6 @@ let rec subst x s tm = match tm with
       TmIsZero (subst x s t)
   | TmVar y ->
       if y = x then s else tm
-  | TmType t -> 
-      if t = x then s else tm
   | TmAbs (y, tyY, t) ->
       if y = x then tm
       else let fvs = free_vars s in
@@ -369,6 +342,8 @@ let rec isval tm = match tm with
   | _ -> false
 ;;
 
+exception NoRuleApplies
+;;
 
 let rec eval1 ctx tm = match tm with
     (* E-IfTrue *)
@@ -480,9 +455,6 @@ let rec eval1 ctx tm = match tm with
   | TmVar s ->
       getvbinding ctx s
 
-  | TmType t ->
-      gettbinding ctx t
-
   | _ ->
       raise NoRuleApplies
 ;;
@@ -507,4 +479,4 @@ let execute ctx = function
       let tm' = eval ctx tm in
       print_endline (s ^ " : " ^ string_of_ty tyTm ^ " = " ^ string_of_term tm');
       addbinding ctx s tyTm tm'
-;;
+  ;;
