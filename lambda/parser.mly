@@ -42,7 +42,9 @@
 %%
 
 s :
-    IDV EQ term EOF
+    IDV EQ ty EOF
+      { BindT ($1, $3) }
+  | IDV EQ term EOF
       { Bind ($1, $3) }
   | term EOF
       { Eval $1 }

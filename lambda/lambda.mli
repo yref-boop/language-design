@@ -37,6 +37,7 @@ type context =
 type command =
     Eval of term
     | Bind of string * term
+    | BindT of string * ty
 ;;
 
 val emptyctx : context;;
