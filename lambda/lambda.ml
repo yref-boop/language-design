@@ -88,6 +88,24 @@ let rec string_of_ty ty = match ty with
 exception Type_error of string
 ;;
 
+let ty_of_string s = match s with
+    "Bool" ->
+      TyBool
+  | "Nat" ->
+      TyNat
+  | "String" ->
+      TyString
+  | "Char" ->
+      TyChar
+  | _ -> raise (Type_error "No type detected")
+  ;;              
+
+  let ty_of_term tm = match tm with
+  TmString s ->
+    ty_of_string s
+  | _ -> raise (Type_error "This isn't a string") 
+  ;;
+
 let rec typeof ctx tm = match tm with
     (* T-True *)
     TmTrue ->
@@ -127,8 +145,8 @@ let rec typeof ctx tm = match tm with
 
     (* T-Var *)
   | TmVar x ->
-      (try gettbinding ctx x with
-       _ -> raise (Type_error ("no binding type for variable " ^ x)))
+          (try gettbinding ctx x with
+          _ -> raise (Type_error ("no binding type for variable " ^ x)))
 
     (* T-Abs *)
   | TmAbs (x, tyT1, t2) ->
@@ -476,7 +494,13 @@ let execute ctx = function
       ctx
   | Bind (s, tm) ->
       let tyTm = typeof ctx tm in
-      let tm' = eval ctx tm in
-      print_endline (s ^ " : " ^ string_of_ty tyTm ^ " = " ^ string_of_term tm');
-      addbinding ctx s tyTm tm'
+      (try
+        let tyStr = ty_of_term tm in
+        print_endline (s ^ " : " ^ string_of_ty tyStr);
+        addtbinding ctx s tyStr
+      with
+        | _ -> (* Catch any exception *)
+        let tm' = eval ctx tm in
+        print_endline (s ^ " : " ^ string_of_ty tyTm ^ " = " ^ string_of_term tm');
+        addbinding ctx s tyTm tm')
   ;;

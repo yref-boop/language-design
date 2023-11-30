@@ -13,6 +13,7 @@ type token =
   | IN
   | CONCAT
   | FIRST
+  | SUB
   | BOOL
   | NAT
   | STRING
