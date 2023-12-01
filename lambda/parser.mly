@@ -25,6 +25,9 @@
 %token FIX
 %token LPAREN
 %token RPAREN
+%token LCURLY
+%token RCURLY
+%token COMMA
 %token DOT
 %token EQ
 %token COLON
@@ -97,6 +100,14 @@ atomicTerm :
       { TmString $1 }
   | CHARV
       { TmChar $1}
+  | LCURLY tupleFields RCURLY
+    { TmTuple $2}  
+
+tupleFields : 
+  term 
+    {[$1]}
+  | term COMMA tupleFields
+    {$1 :: $3}      
 
 ty :
     atomicTy

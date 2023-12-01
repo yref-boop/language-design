@@ -29,6 +29,9 @@ rule token = parse
   | "sub"       { SUB }
   | '('         { LPAREN }
   | ')'         { RPAREN }
+  | '{'         { LCURLY }
+  | '}'         { RCURLY }
+  | ','         { COMMA }
   | '.'         { DOT }
   | '='         { EQ }
   | ':'         { COLON }

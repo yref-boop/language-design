@@ -7,6 +7,7 @@ type ty =
   | TyArr of ty * ty
   | TyString
   | TyChar
+  | TyTuple of ty list
 ;;
 
 
@@ -28,6 +29,7 @@ type term =
   | TmChar of char
   | TmFirst of term
   | TmSub of term
+  | TmTuple of term list
 ;;
 
 type command =
@@ -71,19 +73,6 @@ let getvbinding ctx s =
 ;;
 
 (* TYPE MANAGEMENT (TYPING) *)
-
-let rec string_of_ty ty = match ty with
-    TyBool ->
-      "Bool"
-  | TyNat ->
-      "Nat"
-  | TyArr (ty1, ty2) ->
-      "(" ^ string_of_ty ty1 ^ ")" ^ " -> " ^ "(" ^ string_of_ty ty2 ^ ")"
-  | TyString ->
-      "String"
-  | TyChar ->
-      "Char"
-;;
 
 exception Type_error of string
 ;;
@@ -179,9 +168,26 @@ let rec typeof ctx tm = match tm with
   | TmSub t ->
     if typeof ctx t = TyString then TyString
     else raise (Type_error "argument of sub is not a string")
-
+  
+  | TmTuple fields -> 
+      TyTuple (List.map (fun t -> typeof ctx t) fields)
 ;;
 
+let rec string_of_ty ty = match ty with
+    TyBool ->
+      "Bool"
+  | TyNat ->
+      "Nat"
+  | TyArr (ty1, ty2) ->
+      "(" ^ string_of_ty ty1 ^ ")" ^ " -> " ^ "(" ^ string_of_ty ty2 ^ ")"
+  | TyString ->
+      "String"
+  | TyChar ->
+      "Char"
+  | TyTuple (fields)->
+    let types = String.concat ", " (List.map (fun t -> string_of_ty t) fields) in
+      "{" ^ types ^ "}"
+;;
 
 (* TERMS MANAGEMENT (EVALUATION) *)
 
@@ -226,6 +232,9 @@ let rec string_of_term = function
     "first " ^ "(" ^ "\"" ^ string_of_term t ^ "\"" ^ ")"
   | TmSub t ->
     "sub " ^ "(" ^ "\"" ^ string_of_term t ^ "\"" ^ ")"
+  | TmTuple fields ->
+    let terms = String.concat ", " (List.map (fun t -> string_of_term t) fields) in
+    "tuple " ^ "(" ^ terms ^ ")"
 ;;
 
 let rec ldif l1 l2 = match l1 with
@@ -273,6 +282,8 @@ let rec free_vars tm = match tm with
       free_vars t
   | TmSub t ->
       free_vars t
+  | TmTuple fields -> 
+      List.fold_left (fun fv ti -> lunion (free_vars ti) fv) [] fields    
 ;;
 
 let rec fresh_name x l =
@@ -324,6 +335,8 @@ let rec subst x s tm = match tm with
       TmFirst (subst x s t)
   | TmSub t ->
       TmSub (subst x s t)
+  | TmTuple fields ->
+      TmTuple (List.map (fun t1 -> subst x s t1) fields)    
 ;;
 
 let rec isnumericval tm = match tm with
@@ -338,6 +351,7 @@ let rec isval tm = match tm with
   | TmAbs _ -> true
   | TmString _ -> true
   | TmChar _ -> true
+  | TmTuple fields -> List.for_all (fun ti -> isval ti) fields
   | t when isnumericval t -> true
   | _ -> false
 ;;
@@ -455,8 +469,26 @@ let rec eval1 ctx tm = match tm with
   | TmVar s ->
       getvbinding ctx s
 
+   (* E-Tuple*)
+  | TmTuple fields -> 
+    let rec evalafield = function
+      [] -> raise NoRuleApplies
+      | vi::rest when isval vi -> 
+        let rest' = evalafield rest in
+          vi::rest'
+      | ti::rest -> 
+        let ti' = eval1 ctx ti in 
+        ti'::rest
+    in
+    let fields' = evalafield fields in 
+    TmTuple fields'    
+
   | _ ->
       raise NoRuleApplies
+;;
+
+let apply_ctx ctx tm = 
+  List.fold_left (fun t x -> subst x (getvbinding ctx x) t) tm (free_vars tm)
 ;;
 
 let rec eval ctx tm =
@@ -464,8 +496,7 @@ let rec eval ctx tm =
     let tm' = eval1 ctx tm in
     eval ctx tm'
   with
-    NoRuleApplies ->
-        List.fold_left (fun t x -> subst x (getvbinding ctx x) t) tm (free_vars tm)
+    NoRuleApplies -> apply_ctx ctx tm
 ;;
 
 let execute ctx = function

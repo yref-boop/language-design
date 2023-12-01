@@ -5,6 +5,7 @@ type ty =
   | TyArr of ty * ty
   | TyString
   | TyChar
+  | TyTuple of ty list
 ;;
 
 type term =
@@ -25,6 +26,7 @@ type term =
   | TmChar of char
   | TmFirst of term
   | TmSub of term
+  | TmTuple of term list
 ;;
 
 type binding =

@@ -13,6 +13,7 @@ type token =
   | IN
   | CONCAT
   | FIRST
+  | SUB
   | BOOL
   | NAT
   | STRING
@@ -20,6 +21,9 @@ type token =
   | FIX
   | LPAREN
   | RPAREN
+  | LCURLY
+  | RCURLY
+  | COMMA
   | DOT
   | EQ
   | COLON
