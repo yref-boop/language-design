@@ -33,6 +33,7 @@
 
 %token <int> INTV
 %token <string> IDV
+%token <string> IDT
 %token <string> STRINGV
 %token <char> CHARV
 
@@ -42,8 +43,8 @@
 %%
 
 s :
-    IDV EQ ty EOF
-      { BindT ($1, $3) }
+    IDT EQ ty EOF
+      { BindTy ($1, $3) }
   | IDV EQ term EOF
       { Bind ($1, $3) }
   | term EOF
@@ -55,7 +56,7 @@ term :
   | IF term THEN term ELSE term
       { TmIf ($2, $4, $6) }
   | LAMBDA IDV COLON ty DOT term
-      { TmAbs ($2, $4, $6) }
+      { TmAbs ($2, $4, $6) }  
   | LET IDV EQ term IN term
       { TmLetIn ($2, $4, $6) }
   | LETREC IDV COLON ty EQ term IN term
@@ -104,7 +105,9 @@ ty :
     atomicTy
       { $1 }
   | atomicTy ARROW ty
-      { TyArr ($1, $3) }
+      { TyArr ($1, $3) }  
+  | IDT
+      { TyVarTy ($1)}        
 
 atomicTy :
     LPAREN ty RPAREN
@@ -116,4 +119,4 @@ atomicTy :
   | STRING
       { TyString }
   | CHAR
-      { TyChar }
+      { TyChar }  

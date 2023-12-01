@@ -7,6 +7,7 @@ type ty =
   | TyArr of ty * ty
   | TyString
   | TyChar
+  | TyVarTy of string
 ;;
 
 
@@ -33,7 +34,7 @@ type term =
 type command =
     Eval of term
   | Bind of string * term
-  | BindT of string * ty
+  | BindTy of string * ty
 ;;
 
 type binding =
@@ -51,7 +52,7 @@ let emptyctx =
   []
 ;;
 
-let addtvbinding ctx s ty =
+let addtbinding ctx s ty =
   (s, TyBind ty) :: ctx
 ;;
 
@@ -133,7 +134,7 @@ let rec typeof ctx tm = match tm with
 
     (* T-Abs *)
   | TmAbs (x, tyT1, t2) ->
-      let ctx' = addtvbinding ctx x tyT1 in
+      let ctx' = addtbinding ctx x tyT1 in
       let tyT2 = typeof ctx' t2 in
       TyArr (tyT1, tyT2)
 
@@ -150,7 +151,7 @@ let rec typeof ctx tm = match tm with
     (* T-Let *)
   | TmLetIn (x, t1, t2) ->
       let tyT1 = typeof ctx t1 in
-      let ctx' = addtvbinding ctx x tyT1 in
+      let ctx' = addtbinding ctx x tyT1 in
       typeof ctx' t2
 
     (* T-Fix *)
@@ -240,15 +241,14 @@ let rec lunion l1 l2 = match l1 with
 ;;
 
 let rec free_types ty = match ty with
-    TyBool -> []
-  | TyNat -> []
-  | TyArr -> []
-  | TyString -> []
-  | TyChar -> []
+  TmAbs (s, t, _) ->
+    match t with
+    TyVarTy st->
+      ldif ([st]) [s]
+  ;;  
 
 let rec free_vars tm = match tm with
-
-TmTrue ->
+  TmTrue ->
       []
   | TmFalse ->
       []
@@ -477,9 +477,6 @@ let rec eval ctx tm =
         List.fold_left (fun t x -> subst x (getvbinding ctx x) t) tm (free_vars tm)
 ;;
 
-let rec evalt ctx t =
-  List.fold_left (fun typ x -> SUBST (free_types t))
-
 let execute ctx = function
     Eval tm ->
       let tyTm = typeof ctx tm in
@@ -491,9 +488,8 @@ let execute ctx = function
       let tm' = eval ctx tm in
       print_endline (s ^ " : " ^ string_of_ty tyTm ^ " = " ^ string_of_term tm');
       addbinding ctx s tyTm tm';
-  | BindT (s, t) ->
-      let t' = evalt ctx t in
+  | BindTy (s, t) ->
       print_endline (s ^ " : " ^ string_of_ty t);
-      addtbinding ctx s t';
+      addtbinding ctx s t;
   ;;
 

@@ -5,6 +5,7 @@ type ty =
   | TyArr of ty * ty
   | TyString
   | TyChar
+  | TyVarTy of string
 ;;
 
 type term =
@@ -37,7 +38,7 @@ type context =
 type command =
     Eval of term
     | Bind of string * term
-    | BindT of string * ty
+    | BindTy of string * ty
 ;;
 
 val emptyctx : context;;
