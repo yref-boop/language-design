@@ -20,6 +20,7 @@
 %token SUB
 %token BOOL
 %token NAT
+%token TUPLE
 %token STRING
 %token CHAR
 %token FIX
@@ -63,24 +64,32 @@ term :
       { TmLetIn ($2, TmFix (TmAbs ($2, $4, $6)), $8) }
 
 appTerm :
-    atomicTerm
+    pathTerm
       { $1 }
-  | SUCC atomicTerm
+  | SUCC pathTerm
       { TmSucc $2 }
-  | PRED atomicTerm
+  | PRED pathTerm
       { TmPred $2 }
-  | ISZERO atomicTerm
+  | ISZERO pathTerm
       { TmIsZero $2 }
-  | CONCAT atomicTerm atomicTerm
-      { TmConcat ($2, $3) }
-  | FIX atomicTerm
+  | CONCAT pathTerm pathTerm
+      { TmConcat ($2, $3) } 
+  | FIX pathTerm
       { TmFix $2 }
-  | FIRST atomicTerm
+  | FIRST pathTerm
       { TmFirst $2 }
-  | SUB atomicTerm
-      { TmSub $2 }
-  | appTerm atomicTerm
+  | SUB pathTerm
+      { TmSub $2 }    
+  | appTerm pathTerm
       { TmApp ($1, $2) }
+
+pathTerm :
+  pathTerm DOT DOT STRINGV
+    { TmProj ($1, $4) }
+  | pathTerm DOT DOT INTV 
+    { TmProj ($1, string_of_int $4) }
+  | atomicTerm
+    { $1 }
 
 atomicTerm :
     LPAREN term RPAREN
@@ -101,7 +110,7 @@ atomicTerm :
   | CHARV
       { TmChar $1}
   | LCURLY tupleFields RCURLY
-    { TmTuple $2}  
+      { TmTuple $2}  
 
 tupleFields : 
   term 
@@ -111,7 +120,7 @@ tupleFields :
 
 ty :
     atomicTy
-      { $1 }
+      { $1 }   
   | atomicTy ARROW ty
       { TyArr ($1, $3) }
 
@@ -125,4 +134,12 @@ atomicTy :
   | STRING
       { TyString }
   | CHAR
-      { TyChar }
+      { TyChar }  
+  | TUPLE LCURLY tupleTypes RCURLY
+      { TyTuple ($3)}      
+
+tupleTypes : 
+  ty 
+    {[$1]}
+  | ty COMMA tupleTypes
+    {$1 :: $3}          

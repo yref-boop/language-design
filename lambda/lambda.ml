@@ -30,6 +30,7 @@ type term =
   | TmFirst of term
   | TmSub of term
   | TmTuple of term list
+  | TmProj of term * string
 ;;
 
 type command =
@@ -171,6 +172,13 @@ let rec typeof ctx tm = match tm with
   
   | TmTuple fields -> 
       TyTuple (List.map (fun t -> typeof ctx t) fields)
+
+  | TmProj (tuple, s) -> 
+    match typeof ctx tuple with
+      TyTuple fieldtys -> 
+        (try let element = List.nth fieldtys (int_of_string s - 1) in element with 
+          _ -> raise (Type_error ("Index " ^ s ^ "not found")))
+      | _ -> raise (Type_error ("Tuple type expected (1)"))
 ;;
 
 let rec string_of_ty ty = match ty with
@@ -184,9 +192,9 @@ let rec string_of_ty ty = match ty with
       "String"
   | TyChar ->
       "Char"
-  | TyTuple (fields)->
+  | TyTuple fields->
     let types = String.concat ", " (List.map (fun t -> string_of_ty t) fields) in
-      "{" ^ types ^ "}"
+    "Tuple {" ^ types ^ "}"
 ;;
 
 (* TERMS MANAGEMENT (EVALUATION) *)
@@ -234,7 +242,9 @@ let rec string_of_term = function
     "sub " ^ "(" ^ "\"" ^ string_of_term t ^ "\"" ^ ")"
   | TmTuple fields ->
     let terms = String.concat ", " (List.map (fun t -> string_of_term t) fields) in
-    "tuple " ^ "(" ^ terms ^ ")"
+    "Tuple " ^ "(" ^ terms ^ ")"
+  | TmProj (t, s) ->   
+    "Projection " ^ "[" ^ s ^ "]" ^ "of" ^ string_of_term t
 ;;
 
 let rec ldif l1 l2 = match l1 with
@@ -284,6 +294,14 @@ let rec free_vars tm = match tm with
       free_vars t
   | TmTuple fields -> 
       List.fold_left (fun fv ti -> lunion (free_vars ti) fv) [] fields    
+  | TmProj (t, s) ->
+    match t with
+      | TmTuple fields -> 
+        (try let element = List.nth fields (int_of_string s - 1) in free_vars element with 
+          _ -> 
+            raise (Type_error ("Index " ^ s ^ " not found")))
+      | _ -> 
+        raise(Type_error("Tuple type expected (2)"))
 ;;
 
 let rec fresh_name x l =
@@ -337,6 +355,10 @@ let rec subst x s tm = match tm with
       TmSub (subst x s t)
   | TmTuple fields ->
       TmTuple (List.map (fun t1 -> subst x s t1) fields)    
+  | TmProj (tuple, str) ->
+    match typeof emptyctx tuple with
+      TyTuple fields ->  subst x s tuple
+      | _ ->  raise(Type_error("Tuple type expected (3)"))
 ;;
 
 let rec isnumericval tm = match tm with
@@ -482,6 +504,17 @@ let rec eval1 ctx tm = match tm with
     in
     let fields' = evalafield fields in 
     TmTuple fields'    
+
+  | TmProj (TmTuple fields as v1, lb) when isval v1 -> 
+    (try List.nth fields (int_of_string lb - 1) with
+    _ -> raise NoRuleApplies)
+
+  (**| TmProj (TmTuple fields as v1, lb) when isval v1 -> 
+    (try List.assoc lb fields with _ -> raise NoRuleApplies) *)
+
+  | TmProj (t1, lb) -> 
+    let t1' = eval1 ctx t1 in 
+    TmProj (t1', lb)
 
   | _ ->
       raise NoRuleApplies

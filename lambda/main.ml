@@ -6,7 +6,6 @@ open Lambda;;
 open Parser;;
 open Lexer;;
 
-
 let rec read_input acc =
   let line = read_line () in
   if String.ends_with ~suffix:";;" line then

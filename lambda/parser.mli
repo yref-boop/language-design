@@ -16,6 +16,7 @@ type token =
   | SUB
   | BOOL
   | NAT
+  | TUPLE
   | STRING
   | CHAR
   | FIX

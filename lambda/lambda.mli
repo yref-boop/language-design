@@ -27,6 +27,7 @@ type term =
   | TmFirst of term
   | TmSub of term
   | TmTuple of term list
+  | TmProj of term * string
 ;;
 
 type binding =
