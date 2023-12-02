@@ -33,8 +33,12 @@ type term =
   | TmTuple of term list
   | TmProj of term * string
   | TmRecord of (string * term) list
-  | TmList of term * term
+  (* Lists *)
   | TmEmptyList of ty
+  | TmList of ty * term * term
+  | TmIsEmpty of ty * term
+  | TmHead of ty * term
+  | TmTail of ty * term
 ;;
 
 type command =
@@ -101,11 +105,9 @@ let rec string_of_ty ty = match ty with
       (i, h) :: [] -> i ^ ":=" ^ string_of_ty h
       | (i, h) :: t -> (i ^ ":=" ^ string_of_ty h ^ ", ") ^ aux t
       | [] -> raise (Invalid_argument "Record cannot be empty") 
-    in "Record {" ^ aux fields ^ "}"
-  | TyList ty1 ->
-      string_of_ty ty1 ^ " list"
+    in "Record <" ^ aux fields ^ ">"
+  | TyList ty -> "List [" ^ string_of_ty ty ^ "]"
 ;;
-
 
 let rec typeof ctx tm = match tm with
     (* T-True *)
@@ -218,16 +220,28 @@ let rec typeof ctx tm = match tm with
           _ -> raise (Type_error ("Label " ^ s ^ " not found (type)")))
       | _ -> raise (Type_error ("Unexpected type")))
 
-      (* lists *)
-  | TmList (tm1, tm2) ->
+  (*| TmList (tym tm1, tm2) ->
     let ty1' = typeof ctx tm1 in
     let ty2' = typeof ctx tm2 in
     if ((TyList ty1') == ty2') then ty2'
-    else raise (Type_error (string_of_ty (TyList ty1') ^ " and " ^ (string_of_ty ty2') ^ " are incompatible"))
+    else raise (Type_error (string_of_ty (TyList ty1') ^ " and " ^ (string_of_ty ty2') ^ " are incompatible"))*)
 
-  | TmEmptyList t ->
-      TyList t
+  | TmEmptyList ty -> TyList ty
+        
+  | TmList (ty,h,r) -> TyList ty
+            
+  | TmIsEmpty (ty,t) ->
+      if typeof ctx t = TyList(ty) then TyBool
+      else raise (Type_error ("Argument is not a " ^ "List [" ^ (string_of_ty ty) ^ ".]"))
 
+     (* T-Head *)
+  | TmHead (ty,t) ->
+      if typeof ctx t = TyList(ty) then ty
+      else raise (Type_error ("Argument is not a " ^ "List [" ^ (string_of_ty ty) ^ ".]"))
+      
+  | TmTail (ty,t) ->
+      if typeof ctx t = TyList(ty) then TyList(ty)
+      else raise (Type_error ("Argument is not a " ^ "List [" ^ (string_of_ty ty) ^ ".]"))    
 ;;
 
 (* TERMS MANAGEMENT (EVALUATION) *)
@@ -284,19 +298,19 @@ let rec string_of_term = function
     in "Record " ^ "(" ^ aux fields ^ ")"
   | TmProj (t, s) ->   
     "Projection " ^ "[" ^ s ^ "]" ^ "of" ^ string_of_term t
-  | TmList (h,TmList(a,b)) ->
+  (*| TmList (h,TmList(a,b)) ->
     let rec list_string = function
       TmList (h,t) -> "," ^ string_of_term h ^ list_string t
       | TmEmptyList t -> "]: " ^ string_of_ty t
       | t -> raise (Failure ("incorrect list syntaxis"))
     in
-    "[" ^ string_of_term h ^ list_string (TmList (a,b))
-  | TmList (h, TmEmptyList t) ->
-    "[" ^ string_of_term h ^ "]: " ^ string_of_ty t
-  | TmList (h, t) ->
-    "(" ^ string_of_term h ^ "::" ^ string_of_term t
-  | TmEmptyList t ->
-    "[]:" ^ string_of_ty t
+    "[" ^ string_of_term h ^ list_string (TmList (a,b))*)
+
+  | TmEmptyList ty -> "List [" ^ string_of_ty ty ^ "] : []"
+  | TmList (ty,h,t) -> "List [" ^ string_of_ty ty ^ "] : [" ^ string_of_term h ^ " :: " ^ (string_of_term t) ^ "]"
+  | TmIsEmpty (ty,t) -> "IsEmpty? List [" ^ string_of_ty ty ^ "] : [" ^ string_of_term t ^ "]" 
+  | TmHead (ty,t) -> "Head [" ^ string_of_ty ty ^ "] : ["  ^ string_of_term t ^ "]" 
+  | TmTail (ty,t) -> "Tail [" ^ string_of_ty ty ^ "] : [" ^ string_of_term t ^ "]"  
 ;;
 
 let rec ldif l1 l2 = match l1 with
@@ -364,10 +378,12 @@ let rec free_vars tm = match tm with
             raise (Type_error ("Label " ^ s ^ " not found (term)")))
       | _ -> 
         raise(Type_error("Unexpected type of term")))
-  | TmList (t1, t2) ->
-    lunion (free_vars t1) (free_vars t2)
-  | TmEmptyList _ ->
-      []
+   
+  | TmEmptyList ty -> []
+  | TmList (ty,t1,t2) -> lunion (free_vars t1) (free_vars t2)
+  | TmIsEmpty (ty,t) -> free_vars t
+  | TmHead (ty,t) -> free_vars t
+  | TmTail (ty,t) -> free_vars t    
 ;;
 
 let rec fresh_name x l =
@@ -430,9 +446,12 @@ let rec subst x s tm = match tm with
     (match typeof emptyctx tuple with
       TyTuple fields ->  subst x s tuple
       | _ ->  raise(Type_error("Tuple type expected (3)")))
-  | TmList (t1, t2) ->
-    TmList ((subst x s t1), (subst x s t2))
-  | TmEmptyList (t) -> TmEmptyList t
+
+  | TmEmptyList ty -> tm
+  | TmList (ty,t1,t2) -> TmList (ty, (subst x s t1), (subst x s t2))
+  | TmIsEmpty (ty,t) -> TmIsEmpty (ty, (subst x s t))
+  | TmHead (ty,t) -> TmHead (ty, (subst x s t))
+  | TmTail (ty,t) -> TmTail (ty, (subst x s t))
 ;;
 
 let rec isnumericval tm = match tm with
@@ -449,8 +468,8 @@ let rec isval tm = match tm with
   | TmChar _ -> true
   | TmTuple fields -> List.for_all (fun ti -> isval ti) fields
   | TmRecord list -> List.for_all (fun t -> isval t) (List.map snd list)
-  | TmList _ -> true
   | TmEmptyList _ -> true
+  | TmList(_,h,t) -> (isval h) && (isval t)
   | t when isnumericval t -> true
   | _ -> false
 ;;
@@ -606,9 +625,32 @@ let rec eval1 ctx tm = match tm with
     let t1' = eval1 ctx t1 in 
     TmProj (t1', lb)
 
-  | TmList (t1, t2) ->
-    if (isval t1) then TmList(t1, t2)
-    else TmList(eval1 ctx t1, t2)
+    (*E-Cons2*)
+  |TmList(ty,h,t) when isval h -> TmList(ty,h,(eval1 ctx t))
+  
+    (*E-Cons1*)
+  |TmList(ty,h,t) -> TmList(ty,(eval1 ctx h),t)
+  
+    (*E-IsNilNil*)
+  |TmIsEmpty(ty,TmEmptyList(_)) -> TmTrue
+  
+    (*E-IsNilCons*)
+  |TmIsEmpty(ty,TmList(_,_,_)) -> TmFalse
+  
+    (*E-IsNil*)
+  |TmIsEmpty(ty,t) -> TmIsEmpty(ty,eval1 ctx t)
+  
+    (*E-HeadCons*)
+  |TmHead(ty,TmList(_,h,_))-> h
+  
+    (*E-Head*)
+  |TmHead(ty,t) -> TmHead(ty,eval1 ctx t)
+  
+    (*E-TailCons*)
+  |TmTail(ty,TmList(_,_,t)) -> t
+  
+    (*E-Tail*)
+  |TmTail(ty,t) -> TmTail(ty,eval1 ctx t)  
 
   | _ ->
       raise NoRuleApplies

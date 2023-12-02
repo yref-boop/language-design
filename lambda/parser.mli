@@ -34,6 +34,11 @@ type token =
   | COLON
   | ARROW
   | EOF
+  | NULL
+  | LISTV
+  | ISEMPTY
+  | HEAD
+  | TAIL
   | INTV of (int)
   | IDV of (string)
   | STRINGV of (string)

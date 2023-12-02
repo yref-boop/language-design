@@ -38,6 +38,12 @@
 %token COLON
 %token ARROW
 %token EOF
+%token LIST
+%token NULL
+%token LISTV
+%token ISEMPTY
+%token HEAD
+%token TAIL
 
 %token <int> INTV
 %token <string> IDV
@@ -86,14 +92,24 @@ appTerm :
       { TmSub $2 }    
   | appTerm pathTerm
       { TmApp ($1, $2) }
+  | LISTV LSQUARE ty RSQUARE pathTerm pathTerm
+     { TmList ($3,$5,$6) }
+  | ISEMPTY LSQUARE ty RSQUARE pathTerm
+     { TmIsEmpty ($3,$5) }
+  | HEAD LSQUARE ty RSQUARE pathTerm
+     { TmHead ($3,$5) }
+  | TAIL LSQUARE ty RSQUARE pathTerm
+     { TmTail ($3,$5) }
+  | NULL LSQUARE ty RSQUARE
+     { TmEmptyList ($3) }    
 
 pathTerm :
-    pathTerm DOT DOT IDV
-    { TmProj ($1, $4) }
-  | pathTerm DOT DOT STRINGV
-    { TmProj ($1, $4) }
-  | pathTerm DOT DOT INTV 
-    { TmProj ($1, string_of_int $4) }
+    pathTerm DOT IDV
+    { TmProj ($1, $3) }
+  | pathTerm DOT STRINGV
+    { TmProj ($1, $3) }
+  | pathTerm DOT INTV 
+    { TmProj ($1, string_of_int $3) }
   | atomicTerm
     { $1 }
 
@@ -119,10 +135,6 @@ atomicTerm :
       { TmTuple $2 }
   | LCURLY recordFields RCURLY
       { TmRecord $2 }
-  | LSQUARE RSQUARE COLON ty
-      { TmEmptyList $4 }
-  | LSQUARE term l
-      { TmList ($2,$3) }
 
 tupleFields : 
   term 
@@ -135,12 +147,6 @@ recordFields :
     { [($1, $3)] }
   | IDV EQ term COMMA recordFields
     { ($1, $3) :: $5 }
-
-l :
-    COMMA term l
-      {TmList ($2,$3)}
-  | RSQUARE COLON ty
-      {TmEmptyList $3}
 
 ty :
     atomicTy

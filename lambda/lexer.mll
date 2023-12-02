@@ -29,6 +29,12 @@ rule token = parse
   | "Record"    { RECORD }
   | "Char"      { CHAR }
   | "sub"       { SUB }
+  | "List"      {LIST}
+  | "null"      {NULL}
+  | "l."        {LISTV}
+  | "isEmpty"   {ISEMPTY}
+  | "head"      {HEAD}
+  | "tail"      {TAIL}
   | '('         { LPAREN }
   | ')'         { RPAREN }
   | '{'         { LCURLY }

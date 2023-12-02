@@ -31,8 +31,11 @@ type term =
   | TmTuple of term list
   | TmProj of term * string
   | TmRecord of (string * term) list
-  | TmList of term * term
   | TmEmptyList of ty
+  | TmList of ty * term * term
+  | TmIsEmpty of ty * term
+  | TmHead of ty * term
+  | TmTail of ty * term
 ;;
 
 type binding =
