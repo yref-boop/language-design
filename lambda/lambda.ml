@@ -220,10 +220,11 @@ let rec typeof ctx tm = match tm with
 
       (* lists *)
   | TmList (tm1, tm2) ->
-    let ty1' = typeof ctx tm1 in
-    let ty2' = typeof ctx tm2 in
-    if ((TyList ty1') == ty2') then ty2'
-    else raise (Type_error (string_of_ty (TyList ty1') ^ " and " ^ (string_of_ty ty2') ^ " are incompatible"))
+    let ty1' = string_of_ty (TyList (typeof ctx tm1)) in
+    let ty2  = typeof ctx tm2 in
+    let ty2' = string_of_ty ty2 in
+    if (compare ty1' ty2' == 0) then ty2
+    else raise (Type_error (ty1' ^ " and " ^ ty2' ^ " are incompatible"))
 
   | TmEmptyList t ->
       TyList t
@@ -284,13 +285,6 @@ let rec string_of_term = function
     in "Record " ^ "(" ^ aux fields ^ ")"
   | TmProj (t, s) ->   
     "Projection " ^ "[" ^ s ^ "]" ^ "of" ^ string_of_term t
-  | TmList (h,TmList(a,b)) ->
-    let rec list_string = function
-      TmList (h,t) -> "," ^ string_of_term h ^ list_string t
-      | TmEmptyList t -> "]: " ^ string_of_ty t
-      | t -> raise (Failure ("incorrect list syntaxis"))
-    in
-    "[" ^ string_of_term h ^ list_string (TmList (a,b))
   | TmList (h, TmEmptyList t) ->
     "[" ^ string_of_term h ^ "]: " ^ string_of_ty t
   | TmList (h, t) ->
@@ -432,7 +426,7 @@ let rec subst x s tm = match tm with
       | _ ->  raise(Type_error("Tuple type expected (3)")))
   | TmList (t1, t2) ->
     TmList ((subst x s t1), (subst x s t2))
-  | TmEmptyList (t) -> TmEmptyList t
+  | TmEmptyList t -> TmEmptyList t
 ;;
 
 let rec isnumericval tm = match tm with
@@ -607,7 +601,7 @@ let rec eval1 ctx tm = match tm with
     TmProj (t1', lb)
 
   | TmList (t1, t2) ->
-    if (isval t1) then TmList(t1, t2)
+      if (isval t1) then TmList (t1, eval1 ctx t2)
     else TmList(eval1 ctx t1, t2)
 
   | _ ->
