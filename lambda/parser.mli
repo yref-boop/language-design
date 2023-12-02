@@ -17,11 +17,14 @@ type token =
   | BOOL
   | NAT
   | TUPLE
+  | RECORD
   | STRING
   | CHAR
   | FIX
   | LPAREN
   | RPAREN
+  | LSQUARE
+  | RSQUARE
   | LCURLY
   | RCURLY
   | COMMA

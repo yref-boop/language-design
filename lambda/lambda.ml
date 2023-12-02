@@ -175,8 +175,11 @@ let rec typeof ctx tm = match tm with
   | TmTuple fields -> 
       TyTuple (List.map (fun t -> typeof ctx t) fields)
 
-  | TmRecord t1 ->
-    TyRecord (List.combine (List.map fst t1) (List.map (typeof ctx) (List.map snd t1)))
+  (*| TmRecord t1 ->
+    TyRecord (List.combine (List.map fst t1) (List.map (typeof ctx) (List.map snd t1)))*)
+
+  | TmRecord fields ->
+      let f (li, ti) = (li, typeof ctx ti) in TyRecord (List.map f fields)  
 
   | TmProj (tuple, s) -> 
     match typeof ctx tuple with
@@ -201,15 +204,15 @@ let rec string_of_ty ty = match ty with
       "String"
   | TyChar ->
       "Char"
-  | TyTuple fields->
+  | TyTuple fields ->
     let types = String.concat ", " (List.map (fun t -> string_of_ty t) fields) in
     "Tuple {" ^ types ^ "}"
-  | TyRecord ty ->
+  | TyRecord fields ->
     let rec aux list = match list with
-      (i, h) :: [] -> i ^ ":" ^ string_of_ty h
-      | (i, h) :: t -> (i ^ ":" ^ string_of_ty h ^ ", ") ^ aux t
-      | [] -> raise (Invalid_argument "record cannot be empty") 
-    in "{" ^ aux ty ^ "}"
+      (i, h) :: [] -> i ^ ":=" ^ string_of_ty h
+      | (i, h) :: t -> (i ^ ":=" ^ string_of_ty h ^ ", ") ^ aux t
+      | [] -> raise (Invalid_argument "Record cannot be empty") 
+    in "Record {" ^ aux fields ^ "}"
 ;;
 
 (* TERMS MANAGEMENT (EVALUATION) *)
@@ -258,12 +261,12 @@ let rec string_of_term = function
   | TmTuple fields ->
     let terms = String.concat ", " (List.map (fun t -> string_of_term t) fields) in
     "Tuple " ^ "(" ^ terms ^ ")"
-      | TmRecord (list) ->
-      let rec aux = function
-        | [] -> ""
-        | [(i, h)] -> i ^ " : " ^ string_of_term h
-        | (i, h)::t -> i ^ " : " ^ string_of_term h ^ ", " ^ aux t
-      in "(" ^ aux list ^ ")"
+  | TmRecord fields ->
+    let rec aux list = match list with
+      [] -> ""
+      | [(i, h)] -> i ^ " : " ^ string_of_term h
+      | (i, h)::t -> i ^ " : " ^ string_of_term h ^ ", " ^ aux t
+    in "Record " ^ "(" ^ aux fields ^ ")"
   | TmProj (t, s) ->   
     "Projection " ^ "[" ^ s ^ "]" ^ "of" ^ string_of_term t
 ;;
@@ -382,8 +385,11 @@ let rec subst x s tm = match tm with
       TmSub (subst x s t)
   | TmTuple fields ->
       TmTuple (List.map (fun t1 -> subst x s t1) fields)    
-  | TmRecord t ->
-      TmRecord (List.combine (List.map fst t) (List.map (subst x s) (List.map snd t)))
+  | TmRecord fields -> 
+    let f (li, ti) = (li, subst x s ti) in
+      TmRecord (List.map f fields)    
+  (*| TmRecord t ->
+      TmRecord (List.combine (List.map fst t) (List.map (subst x s) (List.map snd t)))*)
   | TmProj (tuple, str) ->
     match typeof emptyctx tuple with
       TyTuple fields ->  subst x s tuple
@@ -538,11 +544,12 @@ let rec eval1 ctx tm = match tm with
   | TmRecord record ->
     let rec evalfield = function
       [] -> raise NoRuleApplies
-    | (lb, vi)::rest when isval vi ->
+      | (lb, vi)::rest when isval vi ->
         let rest' = evalfield rest in (lb, vi)::rest'
-    | (lb, ti)::rest ->
+      | (lb, ti)::rest ->
         let ti' = eval1 ctx ti in (lb, ti')::rest
-    in let record' = evalfield record in TmRecord record'
+    in let record' = evalfield record in 
+    TmRecord record'
 
   | TmProj (TmTuple fields as v1, lb) when isval v1 -> 
     (try List.nth fields (int_of_string lb - 1) with

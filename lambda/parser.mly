@@ -21,11 +21,14 @@
 %token BOOL
 %token NAT
 %token TUPLE
+%token RECORD
 %token STRING
 %token CHAR
 %token FIX
 %token LPAREN
 %token RPAREN
+%token LSQUARE
+%token RSQUARE
 %token LCURLY
 %token RCURLY
 %token COMMA
@@ -84,7 +87,7 @@ appTerm :
       { TmApp ($1, $2) }
 
 pathTerm :
-  pathTerm DOT DOT STRINGV
+    pathTerm DOT DOT STRINGV
     { TmProj ($1, $4) }
   | pathTerm DOT DOT INTV 
     { TmProj ($1, string_of_int $4) }
@@ -111,8 +114,8 @@ atomicTerm :
       { TmChar $1}
   | LCURLY tupleFields RCURLY
       { TmTuple $2}
-  | LCURLY recordTerm RCURLY
-    { TmRecord $2}
+  | LCURLY recordFields RCURLY
+      { TmRecord $2}
 
 tupleFields : 
   term 
@@ -120,10 +123,10 @@ tupleFields :
   | term COMMA tupleFields
     {$1 :: $3}      
 
-recordTerm:
-  STRINGV COLON term
+recordFields :
+    IDV EQ term
     { [($1, $3)] }
-  | STRINGV COLON term COMMA recordTerm
+  | IDV EQ term COMMA recordFields
     { ($1, $3) :: $5 }
 
 ty :
@@ -144,10 +147,18 @@ atomicTy :
   | CHAR
       { TyChar }  
   | TUPLE LCURLY tupleTypes RCURLY
-      { TyTuple ($3)}      
+      { TyTuple ($3)}   
+  | RECORD LCURLY recordTypes RCURLY
+      { TyRecord ($3)}          
 
 tupleTypes : 
   ty 
     {[$1]}
   | ty COMMA tupleTypes
-    {$1 :: $3}          
+    {$1 :: $3}  
+
+recordTypes : 
+    IDV EQ ty 
+    {[($1, $3)]}
+  | IDV EQ ty COMMA recordTypes
+    {($1, $3) :: $5}              

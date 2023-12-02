@@ -26,12 +26,15 @@ rule token = parse
   | "Nat"       { NAT }
   | "String"    { STRING }
   | "Tuple"     { TUPLE }
+  | "Record"    { RECORD }
   | "Char"      { CHAR }
   | "sub"       { SUB }
   | '('         { LPAREN }
   | ')'         { RPAREN }
   | '{'         { LCURLY }
   | '}'         { RCURLY }
+  | '['         { LSQUARE }
+  | ']'         { RSQUARE }
   | ','         { COMMA }
   | '.'         { DOT }
   | '='         { EQ }
