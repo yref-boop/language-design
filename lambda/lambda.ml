@@ -86,6 +86,18 @@ let getvbinding ctx s =
 exception Type_error of string
 ;;
 
+let rec subtype tm1 tm2 = match (tm1, tm2) with
+  (TyArr(s1, s2), TyArr(t1, t2)) ->
+    ((subtype s1 t1) && (subtype s2 t2))
+  | (TyRecord(r1), TyRecord(r2)) ->
+    let rec contains l1 l2 = match l1 with
+      [] -> true
+      | ((x,ty)::t) -> 
+          (&&) (try subtype ty (List.assoc x l2) with _ -> false) (contains t l2)
+    in contains r1 r2
+  | (tm1, tm2) -> tm1=tm2
+;;
+
 let rec string_of_ty ty = match ty with
     TyBool ->
       "Bool"
@@ -163,7 +175,7 @@ let rec typeof ctx tm = match tm with
       let tyT2 = typeof ctx t2 in
       (match tyT1 with
            TyArr (tyT11, tyT12) ->
-             if tyT2 = tyT11 then tyT12
+             if subtype tyT2 tyT11 then tyT12
              else raise (Type_error "parameter type mismatch")
          | _ -> raise (Type_error "arrow type expected"))
 
@@ -178,7 +190,7 @@ let rec typeof ctx tm = match tm with
     let tyT1 = typeof ctx t1 in
       (match tyT1 with
         TyArr (tyT11, tyT12) ->
-          if tyT11 = tyT12 then tyT12
+          if subtype tyT11 tyT12 then tyT12
           else raise (Type_error "result body not compatible with domain")
       | _ -> raise (Type_error "arrow type expected"))
 
