@@ -87,7 +87,9 @@ appTerm :
       { TmApp ($1, $2) }
 
 pathTerm :
-    pathTerm DOT DOT STRINGV
+    pathTerm DOT DOT IDV
+    { TmProj ($1, $4) }
+  | pathTerm DOT DOT STRINGV
     { TmProj ($1, $4) }
   | pathTerm DOT DOT INTV 
     { TmProj ($1, string_of_int $4) }
