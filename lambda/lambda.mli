@@ -6,6 +6,7 @@ type ty =
   | TyString
   | TyChar
   | TyTuple of ty list
+  | TyRecord of (string * ty) list
 ;;
 
 type term =
@@ -28,6 +29,7 @@ type term =
   | TmSub of term
   | TmTuple of term list
   | TmProj of term * string
+  | TmRecord of (string * term) list
 ;;
 
 type binding =

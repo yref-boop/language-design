@@ -110,13 +110,21 @@ atomicTerm :
   | CHARV
       { TmChar $1}
   | LCURLY tupleFields RCURLY
-      { TmTuple $2}  
+      { TmTuple $2}
+  | LCURLY recordTerm RCURLY
+    { TmRecord $2}
 
 tupleFields : 
   term 
     {[$1]}
   | term COMMA tupleFields
     {$1 :: $3}      
+
+recordTerm:
+  STRINGV COLON term
+    { [($1, $3)] }
+  | STRINGV COLON term COMMA recordTerm
+    { ($1, $3) :: $5 }
 
 ty :
     atomicTy

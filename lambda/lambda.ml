@@ -8,6 +8,7 @@ type ty =
   | TyString
   | TyChar
   | TyTuple of ty list
+  | TyRecord of (string * ty) list
 ;;
 
 
@@ -31,6 +32,7 @@ type term =
   | TmSub of term
   | TmTuple of term list
   | TmProj of term * string
+  | TmRecord of (string * term) list
 ;;
 
 type command =
@@ -173,12 +175,19 @@ let rec typeof ctx tm = match tm with
   | TmTuple fields -> 
       TyTuple (List.map (fun t -> typeof ctx t) fields)
 
+  | TmRecord t1 ->
+    TyRecord (List.combine (List.map fst t1) (List.map (typeof ctx) (List.map snd t1)))
+
   | TmProj (tuple, s) -> 
     match typeof ctx tuple with
       TyTuple fieldtys -> 
         (try let element = List.nth fieldtys (int_of_string s - 1) in element with 
           _ -> raise (Type_error ("Index " ^ s ^ "not found")))
+      | TyRecord fieldtys ->
+          (try List.assoc s fieldtys with
+          _ -> raise (Type_error ("Label " ^ s ^ "not found")))
       | _ -> raise (Type_error ("Tuple type expected (1)"))
+
 ;;
 
 let rec string_of_ty ty = match ty with
@@ -195,6 +204,12 @@ let rec string_of_ty ty = match ty with
   | TyTuple fields->
     let types = String.concat ", " (List.map (fun t -> string_of_ty t) fields) in
     "Tuple {" ^ types ^ "}"
+  | TyRecord ty ->
+    let rec aux list = match list with
+      (i, h) :: [] -> i ^ ":" ^ string_of_ty h
+      | (i, h) :: t -> (i ^ ":" ^ string_of_ty h ^ ", ") ^ aux t
+      | [] -> raise (Invalid_argument "record cannot be empty") 
+    in "{" ^ aux ty ^ "}"
 ;;
 
 (* TERMS MANAGEMENT (EVALUATION) *)
@@ -243,6 +258,12 @@ let rec string_of_term = function
   | TmTuple fields ->
     let terms = String.concat ", " (List.map (fun t -> string_of_term t) fields) in
     "Tuple " ^ "(" ^ terms ^ ")"
+      | TmRecord (list) ->
+      let rec aux = function
+        | [] -> ""
+        | [(i, h)] -> i ^ " : " ^ string_of_term h
+        | (i, h)::t -> i ^ " : " ^ string_of_term h ^ ", " ^ aux t
+      in "(" ^ aux list ^ ")"
   | TmProj (t, s) ->   
     "Projection " ^ "[" ^ s ^ "]" ^ "of" ^ string_of_term t
 ;;
@@ -294,6 +315,12 @@ let rec free_vars tm = match tm with
       free_vars t
   | TmTuple fields -> 
       List.fold_left (fun fv ti -> lunion (free_vars ti) fv) [] fields    
+  | TmRecord t ->
+    let rec aux list = match list with
+      | (i, h)::[] -> free_vars h
+      | (i, h)::t -> lunion (free_vars h) (aux t)
+      | [] -> []
+    in aux t
   | TmProj (t, s) ->
     match t with
       | TmTuple fields -> 
@@ -355,6 +382,8 @@ let rec subst x s tm = match tm with
       TmSub (subst x s t)
   | TmTuple fields ->
       TmTuple (List.map (fun t1 -> subst x s t1) fields)    
+  | TmRecord t ->
+      TmRecord (List.combine (List.map fst t) (List.map (subst x s) (List.map snd t)))
   | TmProj (tuple, str) ->
     match typeof emptyctx tuple with
       TyTuple fields ->  subst x s tuple
@@ -374,6 +403,7 @@ let rec isval tm = match tm with
   | TmString _ -> true
   | TmChar _ -> true
   | TmTuple fields -> List.for_all (fun ti -> isval ti) fields
+  | TmRecord list -> List.for_all (fun t -> isval t) (List.map snd list)
   | t when isnumericval t -> true
   | _ -> false
 ;;
@@ -505,9 +535,21 @@ let rec eval1 ctx tm = match tm with
     let fields' = evalafield fields in 
     TmTuple fields'    
 
+  | TmRecord record ->
+    let rec evalfield = function
+      [] -> raise NoRuleApplies
+    | (lb, vi)::rest when isval vi ->
+        let rest' = evalfield rest in (lb, vi)::rest'
+    | (lb, ti)::rest ->
+        let ti' = eval1 ctx ti in (lb, ti')::rest
+    in let record' = evalfield record in TmRecord record'
+
   | TmProj (TmTuple fields as v1, lb) when isval v1 -> 
     (try List.nth fields (int_of_string lb - 1) with
     _ -> raise NoRuleApplies)
+
+  | TmProj (TmRecord list as v, s) when isval v ->
+    List.assoc s list
 
   (**| TmProj (TmTuple fields as v1, lb) when isval v1 -> 
     (try List.assoc lb fields with _ -> raise NoRuleApplies) *)
