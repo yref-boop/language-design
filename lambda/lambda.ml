@@ -11,7 +11,6 @@ type ty =
   | TyRecord of (string * ty) list
 ;;
 
-
 type term =
     TmTrue
   | TmFalse
@@ -181,15 +180,15 @@ let rec typeof ctx tm = match tm with
   | TmRecord fields ->
       let f (li, ti) = (li, typeof ctx ti) in TyRecord (List.map f fields)  
 
-  | TmProj (tuple, s) -> 
-    match typeof ctx tuple with
+  | TmProj (field, s) -> 
+    match typeof ctx field with
       TyTuple fieldtys -> 
         (try let element = List.nth fieldtys (int_of_string s - 1) in element with 
-          _ -> raise (Type_error ("Index " ^ s ^ "not found")))
+          _ -> raise (Type_error ("Index " ^ s ^ " not found (type)")))
       | TyRecord fieldtys ->
-          (try List.assoc s fieldtys with
-          _ -> raise (Type_error ("Label " ^ s ^ "not found")))
-      | _ -> raise (Type_error ("Tuple type expected (1)"))
+        (try let ty = List.assoc s fieldtys in ty with
+          _ -> raise (Type_error ("Label " ^ s ^ " not found (type)")))
+      | _ -> raise (Type_error ("Unexpected type"))
 
 ;;
 
@@ -329,13 +328,13 @@ let rec free_vars tm = match tm with
       TmTuple fields -> 
         (try let element = List.nth fields (int_of_string s - 1) in free_vars element with 
           _ -> 
-            raise (Type_error ("Index " ^ s ^ " not found")))
+            raise (Type_error ("Index " ^ s ^ " not found (term)")))
       | TmRecord fields ->
         (try let element = List.assoc s fields in free_vars element with
           _ ->
-            raise (Type_error ("Label " ^ s ^ " not found")))
+            raise (Type_error ("Label " ^ s ^ " not found (term)")))
       | _ -> 
-        raise(Type_error("Tuple type expected (2)"))
+        raise(Type_error("Unexpected type of term"))
 ;;
 
 let rec fresh_name x l =
