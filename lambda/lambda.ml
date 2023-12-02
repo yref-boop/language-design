@@ -9,6 +9,7 @@ type ty =
   | TyChar
   | TyTuple of ty list
   | TyRecord of (string * ty) list
+  | TyList of ty
 ;;
 
 type term =
@@ -32,6 +33,8 @@ type term =
   | TmTuple of term list
   | TmProj of term * string
   | TmRecord of (string * term) list
+  | TmList of term * term
+  | TmEmptyList of ty
 ;;
 
 type command =
@@ -78,6 +81,31 @@ let getvbinding ctx s =
 
 exception Type_error of string
 ;;
+
+let rec string_of_ty ty = match ty with
+    TyBool ->
+      "Bool"
+  | TyNat ->
+      "Nat"
+  | TyArr (ty1, ty2) ->
+      "(" ^ string_of_ty ty1 ^ ")" ^ " -> " ^ "(" ^ string_of_ty ty2 ^ ")"
+  | TyString ->
+      "String"
+  | TyChar ->
+      "Char"
+  | TyTuple fields ->
+    let types = String.concat ", " (List.map (fun t -> string_of_ty t) fields) in
+    "Tuple {" ^ types ^ "}"
+  | TyRecord fields ->
+    let rec aux list = match list with
+      (i, h) :: [] -> i ^ ":=" ^ string_of_ty h
+      | (i, h) :: t -> (i ^ ":=" ^ string_of_ty h ^ ", ") ^ aux t
+      | [] -> raise (Invalid_argument "Record cannot be empty") 
+    in "Record {" ^ aux fields ^ "}"
+  | TyList ty1 ->
+      string_of_ty ty1 ^ " list"
+;;
+
 
 let rec typeof ctx tm = match tm with
     (* T-True *)
@@ -181,37 +209,25 @@ let rec typeof ctx tm = match tm with
       let f (li, ti) = (li, typeof ctx ti) in TyRecord (List.map f fields)  
 
   | TmProj (field, s) -> 
-    match typeof ctx field with
+    (match typeof ctx field with
       TyTuple fieldtys -> 
         (try let element = List.nth fieldtys (int_of_string s - 1) in element with 
           _ -> raise (Type_error ("Index " ^ s ^ " not found (type)")))
       | TyRecord fieldtys ->
         (try let ty = List.assoc s fieldtys in ty with
           _ -> raise (Type_error ("Label " ^ s ^ " not found (type)")))
-      | _ -> raise (Type_error ("Unexpected type"))
+      | _ -> raise (Type_error ("Unexpected type")))
 
-;;
+      (* lists *)
+  | TmList (tm1, tm2) ->
+    let ty1' = typeof ctx tm1 in
+    let ty2' = typeof ctx tm2 in
+    if ((TyList ty1') == ty2') then ty2'
+    else raise (Type_error (string_of_ty (TyList ty1') ^ " and " ^ (string_of_ty ty2') ^ " are incompatible"))
 
-let rec string_of_ty ty = match ty with
-    TyBool ->
-      "Bool"
-  | TyNat ->
-      "Nat"
-  | TyArr (ty1, ty2) ->
-      "(" ^ string_of_ty ty1 ^ ")" ^ " -> " ^ "(" ^ string_of_ty ty2 ^ ")"
-  | TyString ->
-      "String"
-  | TyChar ->
-      "Char"
-  | TyTuple fields ->
-    let types = String.concat ", " (List.map (fun t -> string_of_ty t) fields) in
-    "Tuple {" ^ types ^ "}"
-  | TyRecord fields ->
-    let rec aux list = match list with
-      (i, h) :: [] -> i ^ ":=" ^ string_of_ty h
-      | (i, h) :: t -> (i ^ ":=" ^ string_of_ty h ^ ", ") ^ aux t
-      | [] -> raise (Invalid_argument "Record cannot be empty") 
-    in "Record {" ^ aux fields ^ "}"
+  | TmEmptyList t ->
+      TyList t
+
 ;;
 
 (* TERMS MANAGEMENT (EVALUATION) *)
@@ -268,6 +284,19 @@ let rec string_of_term = function
     in "Record " ^ "(" ^ aux fields ^ ")"
   | TmProj (t, s) ->   
     "Projection " ^ "[" ^ s ^ "]" ^ "of" ^ string_of_term t
+  | TmList (h,TmList(a,b)) ->
+    let rec list_string = function
+      TmList (h,t) -> "," ^ string_of_term h ^ list_string t
+      | TmEmptyList t -> "]: " ^ string_of_ty t
+      | t -> raise (Failure ("incorrect list syntaxis"))
+    in
+    "[" ^ string_of_term h ^ list_string (TmList (a,b))
+  | TmList (h, TmEmptyList t) ->
+    "[" ^ string_of_term h ^ "]: " ^ string_of_ty t
+  | TmList (h, t) ->
+    "(" ^ string_of_term h ^ "::" ^ string_of_term t
+  | TmEmptyList t ->
+    "[]:" ^ string_of_ty t
 ;;
 
 let rec ldif l1 l2 = match l1 with
@@ -324,7 +353,7 @@ let rec free_vars tm = match tm with
       | [] -> []
     in aux t
   | TmProj (t, s) ->
-    match t with
+    (match t with
       TmTuple fields -> 
         (try let element = List.nth fields (int_of_string s - 1) in free_vars element with 
           _ -> 
@@ -334,7 +363,11 @@ let rec free_vars tm = match tm with
           _ ->
             raise (Type_error ("Label " ^ s ^ " not found (term)")))
       | _ -> 
-        raise(Type_error("Unexpected type of term"))
+        raise(Type_error("Unexpected type of term")))
+  | TmList (t1, t2) ->
+    lunion (free_vars t1) (free_vars t2)
+  | TmEmptyList _ ->
+      []
 ;;
 
 let rec fresh_name x l =
@@ -394,9 +427,12 @@ let rec subst x s tm = match tm with
   (*| TmRecord t ->
       TmRecord (List.combine (List.map fst t) (List.map (subst x s) (List.map snd t)))*)
   | TmProj (tuple, str) ->
-    match typeof emptyctx tuple with
+    (match typeof emptyctx tuple with
       TyTuple fields ->  subst x s tuple
-      | _ ->  raise(Type_error("Tuple type expected (3)"))
+      | _ ->  raise(Type_error("Tuple type expected (3)")))
+  | TmList (t1, t2) ->
+    TmList ((subst x s t1), (subst x s t2))
+  | TmEmptyList (t) -> TmEmptyList t
 ;;
 
 let rec isnumericval tm = match tm with
@@ -413,6 +449,8 @@ let rec isval tm = match tm with
   | TmChar _ -> true
   | TmTuple fields -> List.for_all (fun ti -> isval ti) fields
   | TmRecord list -> List.for_all (fun t -> isval t) (List.map snd list)
+  | TmList _ -> true
+  | TmEmptyList _ -> true
   | t when isnumericval t -> true
   | _ -> false
 ;;
@@ -567,6 +605,10 @@ let rec eval1 ctx tm = match tm with
   | TmProj (t1, lb) -> 
     let t1' = eval1 ctx t1 in 
     TmProj (t1', lb)
+
+  | TmList (t1, t2) ->
+    if (isval t1) then TmList(t1, t2)
+    else TmList(eval1 ctx t1, t2)
 
   | _ ->
       raise NoRuleApplies

@@ -22,6 +22,7 @@
 %token NAT
 %token TUPLE
 %token RECORD
+%token LIST
 %token STRING
 %token CHAR
 %token FIX
@@ -113,11 +114,15 @@ atomicTerm :
   | STRINGV
       { TmString $1 }
   | CHARV
-      { TmChar $1}
+      { TmChar $1 }
   | LCURLY tupleFields RCURLY
-      { TmTuple $2}
+      { TmTuple $2 }
   | LCURLY recordFields RCURLY
-      { TmRecord $2}
+      { TmRecord $2 }
+  | LSQUARE RSQUARE COLON ty
+      { TmEmptyList $4 }
+  | LSQUARE term l
+      { TmList ($2,$3) }
 
 tupleFields : 
   term 
@@ -130,6 +135,12 @@ recordFields :
     { [($1, $3)] }
   | IDV EQ term COMMA recordFields
     { ($1, $3) :: $5 }
+
+l :
+    COMMA term l
+      {TmList ($2,$3)}
+  | RSQUARE COLON ty
+      {TmEmptyList $3}
 
 ty :
     atomicTy
@@ -149,9 +160,11 @@ atomicTy :
   | CHAR
       { TyChar }  
   | TUPLE LCURLY tupleTypes RCURLY
-      { TyTuple ($3)}   
+      { TyTuple ($3) }   
   | RECORD LCURLY recordTypes RCURLY
-      { TyRecord ($3)}          
+      { TyRecord ($3) }
+  | LIST LSQUARE ty RSQUARE
+      { TyList ($3) }
 
 tupleTypes : 
   ty 
@@ -163,4 +176,4 @@ recordTypes :
     IDV EQ ty 
     {[($1, $3)]}
   | IDV EQ ty COMMA recordTypes
-    {($1, $3) :: $5}              
+    {($1, $3) :: $5}

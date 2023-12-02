@@ -18,6 +18,7 @@ type token =
   | NAT
   | TUPLE
   | RECORD
+  | LIST
   | STRING
   | CHAR
   | FIX
