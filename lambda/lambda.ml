@@ -326,10 +326,14 @@ let rec free_vars tm = match tm with
     in aux t
   | TmProj (t, s) ->
     match t with
-      | TmTuple fields -> 
+      TmTuple fields -> 
         (try let element = List.nth fields (int_of_string s - 1) in free_vars element with 
           _ -> 
             raise (Type_error ("Index " ^ s ^ " not found")))
+      | TmRecord fields ->
+        (try let element = List.assoc s fields in free_vars element with
+          _ ->
+            raise (Type_error ("Label " ^ s ^ " not found")))
       | _ -> 
         raise(Type_error("Tuple type expected (2)"))
 ;;
