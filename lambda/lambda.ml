@@ -175,7 +175,7 @@ let rec typeof ctx tm = match tm with
       let tyT2 = typeof ctx t2 in
       (match tyT1 with
            TyArr (tyT11, tyT12) ->
-             if subtype tyT2 tyT11 then tyT12
+             if subtype tyT11 tyT2 then tyT12
              else raise (Type_error "parameter type mismatch")
          | _ -> raise (Type_error "arrow type expected"))
 
@@ -240,7 +240,12 @@ let rec typeof ctx tm = match tm with
 
   | TmEmptyList ty -> TyList ty
         
-  | TmList (ty,h,r) -> TyList ty
+  | TmList (ty,h,t) ->
+        let tyTh = typeof ctx h in
+        let tyTt = typeof ctx t in
+           if (subtype tyTh ty) && (subtype tyTt (TyList(ty))) then 
+              TyList(ty) else raise (Type_error "elements of list have 
+            different types")
             
   | TmIsEmpty (ty,t) ->
       if typeof ctx t = TyList(ty) then TyBool
