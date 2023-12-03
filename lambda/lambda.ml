@@ -117,11 +117,12 @@ let rec string_of_ty ty = match ty with
       (i, h) :: [] -> i ^ ":=" ^ string_of_ty h
       | (i, h) :: t -> (i ^ ":=" ^ string_of_ty h ^ ", ") ^ aux t
       | [] -> raise (Invalid_argument "Record cannot be empty") 
-    in "Record <" ^ aux fields ^ ">"
+    in "Record {" ^ aux fields ^ "}"
   | TyList ty -> "List [" ^ string_of_ty ty ^ "]"
 ;;
 
 let rec typeof ctx tm = match tm with
+
     (* T-True *)
     TmTrue ->
       TyBool
@@ -216,9 +217,6 @@ let rec typeof ctx tm = match tm with
   | TmTuple fields -> 
       TyTuple (List.map (fun t -> typeof ctx t) fields)
 
-  (*| TmRecord t1 ->
-    TyRecord (List.combine (List.map fst t1) (List.map (typeof ctx) (List.map snd t1)))*)
-
   | TmRecord fields ->
       let f (li, ti) = (li, typeof ctx ti) in TyRecord (List.map f fields)  
 
@@ -231,12 +229,6 @@ let rec typeof ctx tm = match tm with
         (try let ty = List.assoc s fieldtys in ty with
           _ -> raise (Type_error ("Label " ^ s ^ " not found (type)")))
       | _ -> raise (Type_error ("Unexpected type")))
-
-  (*| TmList (tym tm1, tm2) ->
-    let ty1' = typeof ctx tm1 in
-    let ty2' = typeof ctx tm2 in
-    if ((TyList ty1') == ty2') then ty2'
-    else raise (Type_error (string_of_ty (TyList ty1') ^ " and " ^ (string_of_ty ty2') ^ " are incompatible"))*)
 
   | TmEmptyList ty -> TyList ty
         
@@ -262,6 +254,7 @@ let rec typeof ctx tm = match tm with
 ;;
 
 (* TERMS MANAGEMENT (EVALUATION) *)
+
 
 let rec string_of_term = function
     TmTrue ->
@@ -306,28 +299,32 @@ let rec string_of_term = function
     "sub " ^ "(" ^ "\"" ^ string_of_term t ^ "\"" ^ ")"
   | TmTuple fields ->
     let terms = String.concat ", " (List.map (fun t -> string_of_term t) fields) in
-    "Tuple " ^ "(" ^ terms ^ ")"
+    "{" ^ terms ^ "}"
   | TmRecord fields ->
     let rec aux list = match list with
       [] -> ""
       | [(i, h)] -> i ^ " : " ^ string_of_term h
       | (i, h)::t -> i ^ " : " ^ string_of_term h ^ ", " ^ aux t
-    in "Record " ^ "(" ^ aux fields ^ ")"
+    in "{" ^ aux fields ^ "}"
   | TmProj (t, s) ->   
     "Projection " ^ "[" ^ s ^ "]" ^ "of" ^ string_of_term t
-  (*| TmList (h,TmList(a,b)) ->
-    let rec list_string = function
-      TmList (h,t) -> "," ^ string_of_term h ^ list_string t
-      | TmEmptyList t -> "]: " ^ string_of_ty t
-      | t -> raise (Failure ("incorrect list syntaxis"))
-    in
-    "[" ^ string_of_term h ^ list_string (TmList (a,b))*)
-
-  | TmEmptyList ty -> "List [" ^ string_of_ty ty ^ "] : []"
-  | TmList (ty,h,t) -> "List [" ^ string_of_ty ty ^ "] : [" ^ string_of_term h ^ " :: " ^ (string_of_term t) ^ "]"
+  | TmEmptyList ty -> "[]"
+  | TmList (ty,h,t) -> 
+    let rec string_of_list lst = match lst with
+      | TmEmptyList ty -> ""
+      | TmList(ty,h,(TmEmptyList t)) -> string_of_term h
+      | TmList(ty,h,t) -> string_of_term h ^ ", " ^ string_of_list t
+      | t -> string_of_term t
+    in "[" ^ string_of_term h ^ ", " ^ string_of_list t ^ "]"
   | TmIsEmpty (ty,t) -> "IsEmpty? List [" ^ string_of_ty ty ^ "] : [" ^ string_of_term t ^ "]" 
-  | TmHead (ty,t) -> "Head [" ^ string_of_ty ty ^ "] : ["  ^ string_of_term t ^ "]" 
-  | TmTail (ty,t) -> "Tail [" ^ string_of_ty ty ^ "] : [" ^ string_of_term t ^ "]"  
+  | TmHead (ty,t) -> "Head :"  ^ string_of_term t
+  | TmTail (ty,t) -> 
+    let rec string_of_list lst = match lst with
+      | TmEmptyList ty -> ""
+      | TmList(ty,h,(TmEmptyList t)) -> string_of_term h
+      | TmList(ty,h,t) -> string_of_term h ^ ", " ^ string_of_list t
+      | t -> string_of_term t
+    in "Tail: [" ^ string_of_list t ^ "]"
 ;;
 
 let rec ldif l1 l2 = match l1 with
@@ -457,8 +454,6 @@ let rec subst x s tm = match tm with
   | TmRecord fields -> 
     let f (li, ti) = (li, subst x s ti) in
       TmRecord (List.map f fields)    
-  (*| TmRecord t ->
-      TmRecord (List.combine (List.map fst t) (List.map (subst x s) (List.map snd t)))*)
   | TmProj (tuple, str) ->
     (match typeof emptyctx tuple with
       TyTuple fields ->  subst x s tuple
@@ -635,9 +630,6 @@ let rec eval1 ctx tm = match tm with
   | TmProj (TmRecord list as v, s) when isval v ->
     List.assoc s list
 
-  (**| TmProj (TmTuple fields as v1, lb) when isval v1 -> 
-    (try List.assoc lb fields with _ -> raise NoRuleApplies) *)
-
   | TmProj (t1, lb) -> 
     let t1' = eval1 ctx t1 in 
     TmProj (t1', lb)
@@ -696,4 +688,5 @@ let execute ctx = function
       let tm' = eval ctx tm in
       print_endline (s ^ " : " ^ string_of_ty tyTm ^ " = " ^ string_of_term tm');
       addbinding ctx s tyTm tm'
-  ;;
+;;
+
