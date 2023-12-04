@@ -92,7 +92,7 @@ let rec subtype tm1 tm2 = match (tm1, tm2) with
   | (TyRecord(r1), TyRecord(r2)) ->
     let rec contains l1 l2 = match l1 with
       [] -> true
-      | ((x,ty)::t) -> 
+      | ((x,ty)::t) ->
           (&&) (try subtype ty (List.assoc x l2) with _ -> false) (contains t l2)
     in contains r1 r2
   | (tm1, tm2) -> tm1=tm2
@@ -116,7 +116,7 @@ let rec string_of_ty ty = match ty with
     let rec aux list = match list with
       (i, h) :: [] -> i ^ ":=" ^ string_of_ty h
       | (i, h) :: t -> (i ^ ":=" ^ string_of_ty h ^ ", ") ^ aux t
-      | [] -> raise (Invalid_argument "Record cannot be empty") 
+      | [] -> ""
     in "Record {" ^ aux fields ^ "}"
   | TyList ty -> "List [" ^ string_of_ty ty ^ "]"
 ;;

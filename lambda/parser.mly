@@ -135,6 +135,8 @@ atomicTerm :
       { TmTuple $2 }
   | LCURLY recordFields RCURLY
       { TmRecord $2 }
+  | LCURLY RCURLY
+      {TmRecord []}
 
 tupleFields : 
   term 
@@ -143,10 +145,11 @@ tupleFields :
     {$1 :: $3}      
 
 recordFields :
-    IDV EQ term
+  IDV EQ term
     { [($1, $3)] }
   | IDV EQ term COMMA recordFields
     { ($1, $3) :: $5 }
+
 
 ty :
     atomicTy
@@ -167,6 +170,8 @@ atomicTy :
       { TyChar }  
   | TUPLE LCURLY tupleTypes RCURLY
       { TyTuple ($3) }   
+  | LCURLY RCURLY
+      { TyRecord ([]) }
   | RECORD LCURLY recordTypes RCURLY
       { TyRecord ($3) }
   | LIST LSQUARE ty RSQUARE
