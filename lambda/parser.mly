@@ -44,9 +44,11 @@
 %token ISEMPTY
 %token HEAD
 %token TAIL
+%token TYPE
 
 %token <int> INTV
 %token <string> IDV
+%token <string> IDT
 %token <string> STRINGV
 %token <char> CHARV
 
@@ -57,7 +59,11 @@
 
 s :
     IDV EQ term EOF
-      { Bind ($1, $3) }
+      { BindTm ($1, $3) }
+  | TYPE ty EOF
+      { EvalTy ($2) }   
+  | IDT EQ ty EOF
+      { BindTy ($1, $3) }
   | term EOF
       { Eval $1 }
 
@@ -176,6 +182,8 @@ atomicTy :
       { TyRecord ($3) }
   | LIST LSQUARE ty RSQUARE
       { TyList ($3) }
+  | IDT
+      { TyCustom ($1)}
 
 tupleTypes : 
   ty 

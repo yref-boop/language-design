@@ -10,6 +10,7 @@ type ty =
   | TyTuple of ty list
   | TyRecord of (string * ty) list
   | TyList of ty
+  | TyCustom of string
 ;;
 
 type term =
@@ -43,7 +44,9 @@ type term =
 
 type command =
     Eval of term
-  | Bind of string * term
+  | EvalTy of ty
+  | BindTm of string * term
+  | BindTy of string * ty
 ;;
 
 type binding =
@@ -119,6 +122,19 @@ let rec string_of_ty ty = match ty with
       | [] -> ""
     in "Record {" ^ aux fields ^ "}"
   | TyList ty -> "List [" ^ string_of_ty ty ^ "]"
+  | TyCustom str -> str 
+;;
+
+let rec to_basic_type ctx strty = match strty with
+    TyBool -> TyBool
+  | TyNat -> TyNat
+  | TyString -> TyString
+  | TyChar -> TyChar
+  | TyArr (ty1, ty2) -> TyArr (to_basic_type ctx ty1, to_basic_type ctx ty2)
+  | TyTuple (tyList) -> let f ty = to_basic_type ctx ty in TyTuple (List.map f tyList)
+  | TyRecord (tyPairList) -> let f (var, ty) = (var, to_basic_type ctx ty) in TyRecord (List.map f tyPairList)
+  | TyList (ty) -> TyList (to_basic_type ctx ty)
+  | TyCustom (var) -> gettbinding ctx var
 ;;
 
 let rec typeof ctx tm = match tm with
@@ -166,9 +182,10 @@ let rec typeof ctx tm = match tm with
 
     (* T-Abs *)
   | TmAbs (x, tyT1, t2) ->
-      let ctx' = addtbinding ctx x tyT1 in
+      let tyBase = to_basic_type ctx tyT1 in
+      let ctx' = addtbinding ctx x tyBase in
       let tyT2 = typeof ctx' t2 in
-      TyArr (tyT1, tyT2)
+      TyArr (tyBase, tyT2)
 
     (* T-App *)
   | TmApp (t1, t2) ->
@@ -236,8 +253,7 @@ let rec typeof ctx tm = match tm with
         let tyTh = typeof ctx h in
         let tyTt = typeof ctx t in
            if (subtype tyTh ty) && (subtype tyTt (TyList(ty))) then 
-              TyList(ty) else raise (Type_error "elements of list have 
-            different types")
+              TyList(ty) else raise (Type_error "elements of list have different types")
             
   | TmIsEmpty (ty,t) ->
       if typeof ctx t = TyList(ty) then TyBool
@@ -683,10 +699,18 @@ let execute ctx = function
       let tm' = eval ctx tm in
       print_endline ("- : " ^ string_of_ty tyTm ^ " = " ^ string_of_term tm');
       ctx
-  | Bind (s, tm) ->
+  | EvalTy ty ->
+      let tyTm = to_basic_type ctx ty in
+      print_endline ("- : type = " ^ string_of_ty tyTm);
+      ctx
+  | BindTm (s, tm) ->
       let tyTm = typeof ctx tm in
       let tm' = eval ctx tm in
       print_endline (s ^ " : " ^ string_of_ty tyTm ^ " = " ^ string_of_term tm');
       addbinding ctx s tyTm tm'
+  | BindTy (s, ty) ->
+      let tyTm = to_basic_type ctx ty in
+      print_endline (s ^ " : type = " ^ string_of_ty tyTm);
+      addtbinding ctx s tyTm        
 ;;
 

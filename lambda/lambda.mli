@@ -8,6 +8,7 @@ type ty =
   | TyTuple of ty list
   | TyRecord of (string * ty) list
   | TyList of ty
+  | TyCustom of string
 ;;
 
 type term =
@@ -47,7 +48,9 @@ type context =
 ;;
 type command =
     Eval of term
-    | Bind of string * term
+    | EvalTy of ty
+    | BindTm of string * term
+    | BindTy of string * ty
 ;;
 
 val emptyctx : context;;
