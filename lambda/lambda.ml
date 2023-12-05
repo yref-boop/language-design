@@ -11,6 +11,7 @@ type ty =
   | TyRecord of (string * ty) list
   | TyList of ty
   | TyCustom of string
+  | TyVariant of (string * ty) list
 ;;
 
 type term =
@@ -34,6 +35,7 @@ type term =
   | TmTuple of term list
   | TmProj of term * string
   | TmRecord of (string * term) list
+  | TmLabel of string * term * string
   (* Lists *)
   | TmEmptyList of ty
   | TmList of ty * term * term
@@ -114,15 +116,21 @@ let rec string_of_ty ty = match ty with
       "Char"
   | TyTuple fields ->
     let types = String.concat ", " (List.map (fun t -> string_of_ty t) fields) in
-    "Tuple {" ^ types ^ "}"
+    "{" ^ types ^ "}"
   | TyRecord fields ->
     let rec aux list = match list with
-      (i, h) :: [] -> i ^ ":=" ^ string_of_ty h
-      | (i, h) :: t -> (i ^ ":=" ^ string_of_ty h ^ ", ") ^ aux t
+      (i, h) :: [] -> i ^ " : " ^ string_of_ty h
+      | (i, h) :: t -> (i ^ " : " ^ string_of_ty h ^ ", ") ^ aux t
       | [] -> ""
-    in "Record {" ^ aux fields ^ "}"
+    in "{" ^ aux fields ^ "}"
   | TyList ty -> "List [" ^ string_of_ty ty ^ "]"
   | TyCustom str -> str 
+  | TyVariant fields ->
+    let rec aux list = match list with
+      (i, h) :: [] -> i ^ " : " ^ string_of_ty h
+      | (i, h) :: t -> (i ^ " : " ^ string_of_ty h ^ ", ") ^ aux t
+      | [] -> ""
+    in "<" ^ aux fields ^ ">"
 ;;
 
 let rec to_basic_type ctx strty = match strty with
@@ -135,6 +143,7 @@ let rec to_basic_type ctx strty = match strty with
   | TyRecord (tyPairList) -> let f (var, ty) = (var, to_basic_type ctx ty) in TyRecord (List.map f tyPairList)
   | TyList (ty) -> TyList (to_basic_type ctx ty)
   | TyCustom (var) -> gettbinding ctx var
+  | TyVariant (tyPairList) -> let f (str, ty) = (str, to_basic_type ctx ty) in TyVariant (List.map f tyPairList)
 ;;
 
 let rec typeof ctx tm = match tm with
@@ -247,7 +256,35 @@ let rec typeof ctx tm = match tm with
           _ -> raise (Type_error ("Label " ^ s ^ " not found (type)")))
       | _ -> raise (Type_error ("Unexpected type")))
 
-  | TmEmptyList ty -> TyList ty
+    (*let t' = eval1 ctx t in
+    let var' = gettbinding ctx var in
+    (*print_endline("Testing...  The label is " ^ s ^ " and the type is " ^ string_of_ty var');*)
+    (* Assuming var' is a list of pairs (string * type list) *)
+    let f ty l = match ty with
+    | TyVariant tyList when List.exists ((=) l) (List.map fst tyList) ->
+      (*print_endline("Testing...  The label is " ^ l ^ " and the list is " ^ string_of_ty ty);*)
+      TmLabel (s, t', var)
+    | _ ->
+        raise (Type_error "Variable is not of type variant or label doesn't match any label.")
+    in f var' s*)
+
+  | TmLabel (s, t, var) -> 
+      let newTy = gettbinding ctx var in
+      let f ty l = match ty with
+          TyVariant tyList ->
+            let matchingType = List.assoc_opt s tyList in 
+            let checkingType matchTy = match matchTy with
+            | Some(labelType) ->
+                let typeOfT = typeof ctx t in
+                if labelType = typeOfT then ty
+                else raise (Type_error "Type mismatch between label type and type of 't'.")
+            | None -> raise (Type_error "Label doesn't match any label in variant.")
+            in checkingType matchingType
+          | _ -> raise (Type_error "Type invalid for invariant.")   
+      in f newTy s
+
+  (* LISTAS *)
+  | TmEmptyList ty -> TyList (ty)
         
   | TmList (ty,h,t) ->
         let tyTh = typeof ctx h in
@@ -323,7 +360,10 @@ let rec string_of_term = function
       | (i, h)::t -> i ^ " : " ^ string_of_term h ^ ", " ^ aux t
     in "{" ^ aux fields ^ "}"
   | TmProj (t, s) ->   
-    "Projection " ^ "[" ^ s ^ "]" ^ "of" ^ string_of_term t
+    "p(" ^ s ^ ")" ^ "of" ^ string_of_term t
+  | TmLabel (s, t, _) ->
+    "<" ^ s ^ " : " ^ string_of_term t ^ ">"
+    (* LISTS *)
   | TmEmptyList ty -> "[]"
   | TmList (ty,h,t) -> 
     let rec string_of_list lst = match lst with
@@ -408,7 +448,10 @@ let rec free_vars tm = match tm with
             raise (Type_error ("Label " ^ s ^ " not found (term)")))
       | _ -> 
         raise(Type_error("Unexpected type of term")))
-   
+
+  | TmLabel (_, t, _) -> free_vars t
+    
+  (* LISTS *) 
   | TmEmptyList ty -> []
   | TmList (ty,t1,t2) -> lunion (free_vars t1) (free_vars t2)
   | TmIsEmpty (ty,t) -> free_vars t
@@ -474,7 +517,9 @@ let rec subst x s tm = match tm with
     (match typeof emptyctx tuple with
       TyTuple fields ->  subst x s tuple
       | _ ->  raise(Type_error("Tuple type expected (3)")))
-
+  | TmLabel (str, t, var) ->
+    TmLabel (str, subst x s t, var)
+    (* LISTS *)  
   | TmEmptyList ty -> tm
   | TmList (ty,t1,t2) -> TmList (ty, (subst x s t1), (subst x s t2))
   | TmIsEmpty (ty,t) -> TmIsEmpty (ty, (subst x s t))
@@ -650,8 +695,21 @@ let rec eval1 ctx tm = match tm with
     let t1' = eval1 ctx t1 in 
     TmProj (t1', lb)
 
+  | TmLabel (s, t, var) ->  
+    let t' = eval1 ctx t in
+    let var' = gettbinding ctx var in
+    (*print_endline("Testing...  The label is " ^ s ^ " and the type is " ^ string_of_ty var');*)
+    (* Assuming var' is a list of pairs (string * type list) *)
+    let f ty l = match ty with
+    | TyVariant tyList when List.exists ((=) l) (List.map fst tyList) ->
+      (*print_endline("Testing...  The label is " ^ l ^ " and the list is " ^ string_of_ty ty);*)
+      TmLabel (s, t', var)
+    | _ ->
+        raise (Type_error "Variable is not of type variant or label doesn't match any label.")
+    in f var' s
+
     (*E-Cons2*)
-  |TmList(ty,h,t) when isval h -> TmList(ty,h,(eval1 ctx t))
+  | TmList(ty,h,t) when isval h -> TmList(ty,h,(eval1 ctx t))
   
     (*E-Cons1*)
   |TmList(ty,h,t) -> TmList(ty,(eval1 ctx h),t)

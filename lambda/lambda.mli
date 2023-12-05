@@ -9,6 +9,7 @@ type ty =
   | TyRecord of (string * ty) list
   | TyList of ty
   | TyCustom of string
+  | TyVariant of (string * ty) list
 ;;
 
 type term =
@@ -32,6 +33,7 @@ type term =
   | TmTuple of term list
   | TmProj of term * string
   | TmRecord of (string * term) list
+  | TmLabel of string * term * string
   | TmEmptyList of ty
   | TmList of ty * term * term
   | TmIsEmpty of ty * term
