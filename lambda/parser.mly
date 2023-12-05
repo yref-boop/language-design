@@ -60,12 +60,16 @@
 s :
     IDV EQ term EOF
       { BindTm ($1, $3) }
+  | IDT EQ ty EOF
+      { BindTy ($1, $3) }   
   | TYPE ty EOF
       { EvalTy ($2) }   
-  | IDT EQ ty EOF
-      { BindTy ($1, $3) }
   | term EOF
       { Eval $1 }
+  | LET IDV EQ term EOF
+      { BindTm ($2, TmLetIn ($2, $4, TmVar $2)) } 
+  | LETREC IDV COLON ty EQ term EOF   
+      { BindTm ($2, TmLetIn ($2, TmFix (TmAbs ($2, $4, $6)), TmVar $2)) }     
 
 term :
     appTerm
@@ -78,6 +82,7 @@ term :
       { TmLetIn ($2, $4, $6) }
   | LETREC IDV COLON ty EQ term IN term
       { TmLetIn ($2, TmFix (TmAbs ($2, $4, $6)), $8) }
+         
 
 appTerm :
     pathTerm
