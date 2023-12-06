@@ -43,6 +43,10 @@ type token =
   | HEAD
   | TAIL
   | TYPE
+  | CASE
+  | OF
+  | PIPE
+  | FATARROW
   | INTV of (int)
   | IDV of (string)
   | IDT of (string)

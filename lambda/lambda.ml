@@ -273,24 +273,47 @@ let rec typeof ctx tm = match tm with
       in f newTy s
 
   | TmCase (t, clist) -> 
-    let isVariant tm tmty = match tm with
-      TmLabel (s, ltm, var) -> 
+    let rec isVariant tm = match tm with
+      (*TmVar (s) -> isVariant (getvbinding ctx s)*)
+      | TmLabel (s, ltm, var) -> 
+
         let rec compareLabels labels1 labels2 =
           match (labels1, labels2) with
-          | ([], []) -> true  (* Both lists are empty, labels match *)
-          | ((label1, _) :: rest1, (label2, _) :: rest2) ->
+          | ([], []) -> true
+          | ((label1, _) :: rest1, (label2, _, _) :: rest2) ->
               if label1 = label2 then
                   compareLabels rest1 rest2  (* Labels match, check the rest of the lists *)
               else false
           | (_, _) -> false  (* Lists have different lengths, labels don't match *)
 
-          in let labelsMatch = compareLabels var clist in
+          in let labelsMatch l1 l2 = compareLabels l1 l2 in
+            let getVarList lty = match (gettbinding ctx lty) with 
+              | TyVariant (tylist) -> tylist 
+              | _ -> raise (Type_error "I'm kinda lost.")
 
-            if (labelsMatch var clist) == true 
+            in if (labelsMatch (getVarList var) clist) == true 
               then 
+
                 (* Find the variable of the correct case *)
+                let rec auxFindLabel labels = match labels with
+                  | [] -> None
+                  | (label, varname, term) :: tail ->
+                      if label = s then Some varname
+                      else auxFindLabel tail  (* Check the rest of the list *)
                 
-                gettbinding ctx var (* Return the type of the input invariant*)
+                in let findLabel tarlist = match auxFindLabel tarlist with
+                  | Some result -> (* result should be of type string *)
+                    ( try 
+                        let ftype = typeof ctx t in 
+                          let tyTm = typeof ctx t in 
+                          (* addbinding ctx result tyTm ltm; *)
+                          ftype
+                      with _ -> raise (Type_error "No binding here")
+                    )
+                  | None -> raise (Type_error "No matching label found in cases.")
+                
+                in findLabel clist
+                
               else raise (Type_error "Cases don't align with the possible labels of variable.")
 
     | _ -> raise (Type_error "Variable for case must be an invariant.")
@@ -376,6 +399,13 @@ let rec string_of_term = function
     "p(" ^ s ^ ")" ^ "of" ^ string_of_term t
   | TmLabel (s, t, _) ->
     "<" ^ s ^ " : " ^ string_of_term t ^ ">"
+  | TmCase (label, cases) -> 
+    let rec traverse list out = match list with
+      [] -> out
+    | [(l, t, term) :: []] -> traverse [] (out ^ "\n-: <" ^ l ^ "=" ^ t ^"> => " ^ string_of_term term)
+    | [(l, t, term) :: tail] -> traverse [tail] (out ^ "\n-: <" ^ l ^ "=" ^ t ^"> => " ^ string_of_term term)
+    | _ -> raise (Type_error "This should happend, right? (1)")
+    in "case " ^ string_of_term label ^ " of" ^ (traverse [cases] "")
     (* LISTS *)
   | TmEmptyList ty -> "[]"
   | TmList (ty,h,t) -> 
@@ -463,6 +493,13 @@ let rec free_vars tm = match tm with
         raise(Type_error("Unexpected type of term")))
 
   | TmLabel (_, t, _) -> free_vars t
+  | TmCase (tmlabel, tmcases) -> 
+    let rec traverse list out = match list with
+    | [] -> out
+    | [(_, _, term) :: []] -> traverse [] (out @ free_vars term)
+    | [(_, _, term) :: tail] -> traverse [tail] (out @ free_vars term)
+    | _ -> raise (Type_error "This should happend, right? (2)")
+    in (free_vars tmlabel) @ (traverse [tmcases] [])
     
   (* LISTS *) 
   | TmEmptyList ty -> []
@@ -532,6 +569,8 @@ let rec subst x s tm = match tm with
       | _ ->  raise(Type_error("Tuple type expected (3)")))
   | TmLabel (str, t, var) ->
     TmLabel (str, subst x s t, var)
+  | TmCase (label, l) -> 
+    TmCase (subst x s label, l)
     (* LISTS *)  
   | TmEmptyList ty -> tm
   | TmList (ty,t1,t2) -> TmList (ty, (subst x s t1), (subst x s t2))
@@ -711,15 +750,23 @@ let rec eval1 ctx tm = match tm with
   | TmLabel (s, t, var) ->  
     let t' = eval1 ctx t in
     let var' = gettbinding ctx var in
-    (*print_endline("Testing...  The label is " ^ s ^ " and the type is " ^ string_of_ty var');*)
     (* Assuming var' is a list of pairs (string * type list) *)
     let f ty l = match ty with
     | TyVariant tyList when List.exists ((=) l) (List.map fst tyList) ->
-      (*print_endline("Testing...  The label is " ^ l ^ " and the list is " ^ string_of_ty ty);*)
       TmLabel (s, t', var)
     | _ ->
         raise (Type_error "Variable is not of type variant or label doesn't match any label.")
     in f var' s
+
+  | TmCase (label, cases) ->
+    let tlabel = eval1 ctx label in
+    let extracted_label = match tlabel with TmLabel (l, _, _) -> l | _ -> raise (Type_error "No label found.") in
+    let rec traverse list = match list with
+      [] -> raise (Type_error "Run through every label, no matches detected.")
+    | [(l, t, term) :: []] -> if l == extracted_label then eval1 ctx term else traverse []
+    | [(l, t, term) :: tail] -> if l == extracted_label then eval1 ctx term else traverse [tail]
+    | _ -> raise (Type_error "This should happend, right? (3)")
+    in traverse [cases]
 
     (*E-Cons2*)
   | TmList(ty,h,t) when isval h -> TmList(ty,h,(eval1 ctx t))

@@ -73,7 +73,6 @@ s :
       { EvalTy ($2) }   
   | term EOF
       { Eval $1 }
-    (* Syntantic sugar *)
   | LET IDV EQ term EOF
       { BindTm ($2, TmLetIn ($2, $4, TmVar $2)) } 
   | LETREC IDV COLON ty EQ term EOF   
@@ -97,7 +96,7 @@ caseTerm :
     LTRIFORCE IDV EQ IDV RTRIFORCE FATARROW term 
     {[($2, $4, $7)]}
   | LTRIFORCE IDV EQ IDV RTRIFORCE FATARROW term PIPE caseTerm
-    {($2, $4, $7) :: $3}  
+    {($2, $4, $7) :: $9}  
          
 appTerm :
     pathTerm
