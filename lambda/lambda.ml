@@ -36,6 +36,7 @@ type term =
   | TmProj of term * string
   | TmRecord of (string * term) list
   | TmLabel of string * term * string
+  | TmCase of term * ((string * string * term) list)
   (* Lists *)
   | TmEmptyList of ty
   | TmList of ty * term * term
@@ -256,18 +257,6 @@ let rec typeof ctx tm = match tm with
           _ -> raise (Type_error ("Label " ^ s ^ " not found (type)")))
       | _ -> raise (Type_error ("Unexpected type")))
 
-    (*let t' = eval1 ctx t in
-    let var' = gettbinding ctx var in
-    (*print_endline("Testing...  The label is " ^ s ^ " and the type is " ^ string_of_ty var');*)
-    (* Assuming var' is a list of pairs (string * type list) *)
-    let f ty l = match ty with
-    | TyVariant tyList when List.exists ((=) l) (List.map fst tyList) ->
-      (*print_endline("Testing...  The label is " ^ l ^ " and the list is " ^ string_of_ty ty);*)
-      TmLabel (s, t', var)
-    | _ ->
-        raise (Type_error "Variable is not of type variant or label doesn't match any label.")
-    in f var' s*)
-
   | TmLabel (s, t, var) -> 
       let newTy = gettbinding ctx var in
       let f ty l = match ty with
@@ -282,6 +271,27 @@ let rec typeof ctx tm = match tm with
             in checkingType matchingType
           | _ -> raise (Type_error "Type invalid for invariant.")   
       in f newTy s
+
+  | TmCase (t, clist) -> 
+    let isVariant tm tmty = match tm with
+      TmLabel (s, _, var) -> 
+        let rec compareLabels labels1 labels2 =
+          match (labels1, labels2) with
+          | ([], []) -> true  (* Both lists are empty, labels match *)
+          | ((label1, _) :: rest1, (label2, _) :: rest2) ->
+              if label1 = label2 then
+                  compareLabels rest1 rest2  (* Labels match, check the rest of the lists *)
+              else false
+          | (_, _) -> false  (* Lists have different lengths, labels don't match *)
+
+          in let labelsMatch = compareLabels var clist in
+
+            if (labelsMatch var clist) == true 
+              then gettbinding ctx var (* Return the type of the input invariant*)
+              else raise (Type_error "Cases don't align with the possible labels of variable.")
+
+    | _ -> raise (Type_error "Variable for case must be an invariant.")
+    in isVariant t    
 
   (* LISTAS *)
   | TmEmptyList ty -> TyList (ty)

@@ -34,6 +34,7 @@ type term =
   | TmProj of term * string
   | TmRecord of (string * term) list
   | TmLabel of string * term * string
+  | TmCase of term * ((string * string * term) list)
   | TmEmptyList of ty
   | TmList of ty * term * term
   | TmIsEmpty of ty * term

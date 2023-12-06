@@ -48,6 +48,10 @@ rule token = parse
   | '.'         { DOT }
   | '='         { EQ }
   | "as"        { AS }
+  | "of"        { OF }
+  | "case"      { CASE }
+  | '|'         { PIPE }
+  | "=>"        { FATARROW }
   | ':'         { COLON }
   | "->"        { ARROW }
   | ['0'-'9']+  { INTV (int_of_string (Lexing.lexeme lexbuf)) }

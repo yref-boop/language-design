@@ -48,6 +48,10 @@
 %token HEAD
 %token TAIL
 %token TYPE
+%token CASE
+%token OF
+%token PIPE
+%token FATARROW
 
 %token <int> INTV
 %token <string> IDV
@@ -69,6 +73,7 @@ s :
       { EvalTy ($2) }   
   | term EOF
       { Eval $1 }
+    (* Syntantic sugar *)
   | LET IDV EQ term EOF
       { BindTm ($2, TmLetIn ($2, $4, TmVar $2)) } 
   | LETREC IDV COLON ty EQ term EOF   
@@ -85,8 +90,15 @@ term :
       { TmLetIn ($2, $4, $6) }
   | LETREC IDV COLON ty EQ term IN term
       { TmLetIn ($2, TmFix (TmAbs ($2, $4, $6)), $8) }
-         
+  | CASE term OF caseTerm
+      { TmCase ($2, $4) }    
 
+caseTerm :
+    LTRIFORCE IDV EQ IDV RTRIFORCE FATARROW term 
+    {[($2, $4, $7)]}
+  | LTRIFORCE IDV EQ IDV RTRIFORCE FATARROW term PIPE caseTerm
+    {($2, $4, $7) :: $3}  
+         
 appTerm :
     pathTerm
       { $1 }
@@ -107,7 +119,7 @@ appTerm :
   | appTerm pathTerm
       { TmApp ($1, $2) }
   | LTRIFORCE IDV EQ term RTRIFORCE AS IDT
-      { TmLabel ($2, $4, $7)}      
+      { TmLabel ($2, $4, $7)}            
   | LISTV LSQUARE ty RSQUARE pathTerm pathTerm
      { TmList ($3,$5,$6) }
   | ISEMPTY LSQUARE ty RSQUARE pathTerm
@@ -118,6 +130,7 @@ appTerm :
      { TmTail ($3,$5) }
   | NULL LSQUARE ty RSQUARE
      { TmEmptyList ($3) }    
+
 
 pathTerm :
     pathTerm DOT IDV
