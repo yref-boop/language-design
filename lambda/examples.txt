@@ -94,17 +94,18 @@ pretty-printer OBJETIVE
         lambda n : Nat. lambda m : Nat. if iszero n then m else (succ (sum (pred n) m))
     ;;
 
-    sum : Nat -> Nat -> Nat =
-        lambda n:Nat.
-        lambda m:Nat.
-        if iszero n then m
-        else (succ (
-            fix (lambda sum : Nat -> Nat -> Nat
-            lambda n:Nat.
-            lambda m:Nat.
-            if iszero n then m
-            else (succ (sum (pred n) m))) (pred n) m))
 
+sum : Nat-> Nat-> Nat =
+ lambda n:Nat.
+  lambda m:Nat.
+   if iszero n then m else
+    succ
+     (((fix
+         lambda sum:Nat-> Nat-> Nat.
+          lambda n:Nat.
+           lambda m:Nat. if iszero n then m else succ ((sum (pred n)) m))
+        (pred n))
+       m)
 
 TERMS INNER STRUCTURE:
 
@@ -120,9 +121,9 @@ schema:
       TmIsZero            (if) iszero
        TmVar               n
       TmVar               (then) m
-      TmSucc              (else) succ
-       TmApp
-        TmApp
+      TmSucc              (else) succ     *()
+       TmApp                              *()
+        TmApp                             *()
          TmFix            fix
           TmAbs           sum
            TmAbs          n
@@ -131,13 +132,13 @@ schema:
               ImIsZero    (if) iszero
                TmVar       n
               TmVar       (then) m
-              TmSucc      (else) succ
-               TmApp
+              TmSucc      (else) succ     *()
+               TmApp                      *()
                 TmApp
-                 TmVar    sum
+                 TmVar    sum             *()
                  TmPred   pred
                   TmVar    n
                 TmVar     m
-             TmPred       pred
+             TmPred       pred            *()
               TmVar        n
             TmVar         m
