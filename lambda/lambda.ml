@@ -1,4 +1,5 @@
 open Format;;
+open Option;;
 
 (* TYPE DEFINITIONS *)
 
@@ -149,6 +150,21 @@ let rec print_type = function
     print_type t2;
     close_box ();
     ()
+  | TyList ty ->
+    print_string "List";
+    open_box 1;
+    print_type ty;
+    close_box ();
+    ()
+  | ty -> print_atomic_type ty;
+
+and print_atomic_type = function
+  TyBool -> print_string "Bool"; ()
+  | TyNat -> print_string "Nat"; ()
+  | TyString -> print_string "String"; ()
+  | TyChar -> print_string "Char"; ()
+  | TyCustom ty -> print_string ty; ()
+  (* TODO: debug polimorfic case *)
   | TyTuple [] -> print_string "{}"
   | TyTuple l ->
     let rec aux = function
@@ -192,20 +208,7 @@ let rec print_type = function
       close_box ();
       print_char '}';
         ()
-  | TyList ty ->
-    print_string "List";
-    open_box 1;
-    print_type ty;
-    close_box ();
-    ()
-  | ty -> print_atomic_type ty;
-
-and print_atomic_type = function
-  TyBool -> print_string "Bool"; ()
-  | TyNat -> print_string "Nat"; ()
-  | TyString -> print_string "String"; ()
-  | TyChar -> print_string "Char"; ()
-  | TyCustom ty -> print_string ty; ()
+  (* TODO: polimoric types fall here on loop *)
   | ty ->
     print_char '(';
     open_box 1;
@@ -308,17 +311,17 @@ let rec typeof ctx tm = match tm with
   | TmSub t ->
     if typeof ctx t = TyString then TyString
     else raise (Type_error "argument of sub is not a string")
-  
-  | TmTuple fields -> 
+
+  | TmTuple fields ->
       TyTuple (List.map (fun t -> typeof ctx t) fields)
 
   | TmRecord fields ->
-      let f (li, ti) = (li, typeof ctx ti) in TyRecord (List.map f fields)  
+      let f (li, ti) = (li, typeof ctx ti) in TyRecord (List.map f fields)
 
-  | TmProj (field, s) -> 
+  | TmProj (field, s) ->
     (match typeof ctx field with
-      TyTuple fieldtys -> 
-        (try let element = List.nth fieldtys (int_of_string s - 1) in element with 
+      TyTuple fieldtys ->
+        (try let element = List.nth fieldtys (int_of_string s - 1) in element with
           _ -> raise (Type_error ("Index " ^ s ^ " not found (type)")))
       | TyRecord fieldtys ->
         (try let ty = List.assoc s fieldtys in ty with
@@ -326,13 +329,13 @@ let rec typeof ctx tm = match tm with
       | _ -> raise (Type_error ("Unexpected type")))
 
   | TmEmptyList ty -> TyList ty
-        
+
   | TmList (ty,h,t) ->
         let tyTh = typeof ctx h in
         let tyTt = typeof ctx t in
            if (subtype tyTh ty) && (subtype tyTt (TyList(ty))) then 
               TyList(ty) else raise (Type_error "elements of list have different types")
-            
+
   | TmIsEmpty (ty,t) ->
       if typeof ctx t = TyList(ty) then TyBool
       else raise (Type_error ("Argument is not a " ^ "List [" ^ (string_of_ty ty) ^ ".]"))
@@ -344,7 +347,7 @@ let rec typeof ctx tm = match tm with
 
   | TmTail (ty,t) ->
       if typeof ctx t = TyList(ty) then TyList(ty)
-      else raise (Type_error ("Argument is not a " ^ "List [" ^ (string_of_ty ty) ^ ".]"))    
+      else raise (Type_error ("Argument is not a " ^ "List [" ^ (string_of_ty ty) ^ ".]"))
 ;;
 
 (* TERMS MANAGEMENT (EVALUATION) *)
@@ -519,6 +522,7 @@ let rec print_term =
       ()
 
     (*projections*)
+  (* TODO: debug polimorfic case *)
   and print_projection = function
     TmProj (t1, fn) ->
       open_box 1;
@@ -594,6 +598,7 @@ let rec print_term =
       in f 1 t
     | TmString s -> print_string s; ()
     | TmRecord [] -> print_string "{}"; ()
+    (* TODO: polimorfic types fall here on loop*)
     | tm ->
       print_char '(';
       open_box 1;
@@ -1055,8 +1060,10 @@ let rec eval ctx tm =
     NoRuleApplies -> apply_ctx ctx tm
 ;;
 
-(* s : tyTm = tm *)
 let printer s tyTm tm =
+
+    (* terms *)
+  if (is_some tm) then (
     open_box 1;
       print_string s;
       print_space ();
@@ -1067,10 +1074,29 @@ let printer s tyTm tm =
       print_char '=';
       print_space();
       open_box 1;
-        print_term tm;
+        print_term (get tm);
     close_box ();
     print_newline();
     print_flush ();
+  )
+
+    (* types *)
+  else (
+    open_box 1;
+      print_string s;
+      print_space ();
+      print_char ':';
+      print_space ();
+      print_string "type";
+      print_space ();
+      print_char '=';
+      print_space();
+      print_type tyTm;
+    close_box ();
+    print_newline();
+    print_flush ();
+
+  )
 ;;
 
 let execute ctx = function
@@ -1078,26 +1104,26 @@ let execute ctx = function
       let tyTm = typeof ctx tm in
       let tm' = eval ctx tm in
       (*:print_endline ("- : " ^ string_of_ty tyTm ^ " = " ^ string_of_term tm');*)
-      printer "-" tyTm tm';
+      printer "-" tyTm (some tm');
       ctx
 
   | EvalTy ty ->
       let tyTm = to_basic_type ctx ty in
       (*print_endline ("- : type = " ^ string_of_ty tyTm);*)
-      print_type tyTm;
+      printer "-" tyTm None;
       ctx
 
   | BindTm (s, tm) ->
       let tyTm = typeof ctx tm in
       let tm' = eval ctx tm in
       (*print_endline (s ^ " : " ^ string_of_ty tyTm ^ " = " ^ string_of_term tm');*)
-      printer s tyTm tm';
+      printer s tyTm (some tm');
 
       addbinding ctx s tyTm tm'
   | BindTy (s, ty) ->
       let tyTm = to_basic_type ctx ty in
-      print_endline (s ^ " : type = " ^ string_of_ty tyTm);
-      (* printer s tyTm ""; *)
+      (* print_endline (s ^ " : type = " ^ string_of_ty tyTm); *)
+      printer s tyTm None;
       addtbinding ctx s tyTm
 ;;
 
