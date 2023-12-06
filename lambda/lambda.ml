@@ -274,7 +274,7 @@ let rec typeof ctx tm = match tm with
 
   | TmCase (t, clist) -> 
     let isVariant tm tmty = match tm with
-      TmLabel (s, _, var) -> 
+      TmLabel (s, ltm, var) -> 
         let rec compareLabels labels1 labels2 =
           match (labels1, labels2) with
           | ([], []) -> true  (* Both lists are empty, labels match *)
@@ -287,7 +287,10 @@ let rec typeof ctx tm = match tm with
           in let labelsMatch = compareLabels var clist in
 
             if (labelsMatch var clist) == true 
-              then gettbinding ctx var (* Return the type of the input invariant*)
+              then 
+                (* Find the variable of the correct case *)
+                
+                gettbinding ctx var (* Return the type of the input invariant*)
               else raise (Type_error "Cases don't align with the possible labels of variable.")
 
     | _ -> raise (Type_error "Variable for case must be an invariant.")
