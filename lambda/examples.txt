@@ -17,10 +17,18 @@ let x = 5 in let id_nat = L x:Nat. x in id_nat x
 let fix = lambda f.(lambda x. f (lambda y. x x y)) (lambda x. f (lambda y. x x y)) in let sumaux = lambda f. (lambda n. (lambda m. if (iszero n) then m else succ (f (pred n) m))) in let sum = fix sumaux in sum 21 34
 let fix = lambda f.(lambda x. f (lambda y. x x y)) (lambda x. f (lambda y. x x y)) in let sumaux = lambda f. (lambda n. (lambda m. if (iszero n) then m else succ (f (pred n) m))) in let sum = fix sumaux in let prodaux = lambda f. (lambda n. (lambda m. if (iszero m) then 0 else sum n (f n (pred m)))) in let prod = fix prodaux in prod 12 5
 
+x = letrec sum : Nat -> Nat -> Nat =
+  lambda n : Nat. lambda m : Nat. if iszero n then m else (succ (sum (pred n) m))
+in sum;;
+
+let id = L x:Nat. x;;
+
+
 letrec sum: Nat -> Nat -> Nat =
     lambda n : Nat. lambda m : Nat. 
     if iszero n then m 
     else succ (sum (pred n) m) 
+;;
 in
 
 letrec prod: Nat -> Nat -> Nat =
@@ -53,3 +61,83 @@ letrec fib: Nat -> Nat =
 	else sum (fib (pred n)) (fib (pred (pred n)))
 in fib 5;
 
+
+PRETTY PRINTER ================================================================
+
+ORIGINAL VERSION:
+  >> letrec sum : Nat -> Nat -> Nat =
+    lambda n : Nat. lambda m : Nat. if iszero n then m else (succ (sum (pred n) m))
+     ;;
+
+  sum : (Nat) -> ((Nat) -> (Nat)) = (lambda n:Nat. (lambda m:Nat. if (iszero (n)) then (m) else (succ ((((fix (lambda sum:(Nat) -> ((Nat) -> (Nat)). (lambda n:Nat. (lambda m:Nat. if (iszero (n)) then (m) else (succ (((sum pred (n)) m))))))) pred (n)) m)))))
+
+let in : (Nat -> Nat) Nat =
+  lambda f : (Nat -> Nat). lambda x : Nat.
+  f x 1
+;;
+
+pretty-printer I
+  >> letrec sum : Nat -> Nat -> Nat =
+    lambda n : Nat. lambda m : Nat. if iszero n then m else (succ (sum (pred n) m))
+  ;;
+
+  sum : Nat -> Nat -> Nat = 
+  (lambda n:Nat. 
+  (lambda m:Nat. if (iszero (n)) then (m) else (succ ((((fix 
+  (lambda sum:Nat -> Nat -> Nat. 
+  (lambda n:Nat. 
+  (lambda m:Nat. if (iszero (n)) then (m) else (succ (((sum pred (n)) m))))))) pred (n)) m)))))
+
+pretty-printer OBJETIVE
+
+    >> letrec sum : Nat -> Nat -> Nat =
+        lambda n : Nat. lambda m : Nat. if iszero n then m else (succ (sum (pred n) m))
+    ;;
+
+    sum : Nat -> Nat -> Nat =
+        lambda n:Nat.
+        lambda m:Nat.
+        if iszero n then m
+        else (succ (
+            fix (lambda sum : Nat -> Nat -> Nat
+            lambda n:Nat.
+            lambda m:Nat.
+            if iszero n then m
+            else (succ (sum (pred n) m))) (pred n) m))
+
+
+TERMS INNER STRUCTURE:
+
+inner terms:
+  TmAbs(TmAbs(TmAbs(TmIf((TmIsZero(TmVar)),(TmVar),(TmSucc(TmApp(TmApp(TmFix(TmAbs(TmAbs(TmAbs(TmIf((TmIsZero(TmVar)),(TmVar),(TmSucc(TmApp(TmApp((TmVar),(TmPred(TmVar)))),TmVar)))))))),(TmPred(TmVar)),TmVar)))))))
+   sum    n     m         ifiszero   n      then m  else succ ()   ()   fix   sum    n     m         ifiszero   n    then m    succ    ()    ()    sum      pred    n         m             pred    n       m
+
+schema:
+  TmAbs                   sum
+   TmAbs                  n
+    TmAbs                 m
+     TmIf
+      TmIsZero            (if) iszero
+       TmVar               n
+      TmVar               (then) m
+      TmSucc              (else) succ
+       TmApp
+        TmApp
+         TmFix            fix
+          TmAbs           sum
+           TmAbs          n
+            TmAbs         m
+             TmIf
+              ImIsZero    (if) iszero
+               TmVar       n
+              TmVar       (then) m
+              TmSucc      (else) succ
+               TmApp
+                TmApp
+                 TmVar    sum
+                 TmPred   pred
+                  TmVar    n
+                TmVar     m
+             TmPred       pred
+              TmVar        n
+            TmVar         m
