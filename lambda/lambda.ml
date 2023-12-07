@@ -92,6 +92,160 @@ let getvbinding ctx s =
 exception Type_error of string
 ;;
 
+let rec ldif l1 l2 = match l1 with
+    [] -> []
+  | h::t -> if List.mem h l2 then ldif t l2 else h::(ldif t l2)
+;;
+
+let rec lunion l1 l2 = match l1 with
+    [] -> l2
+  | h::t -> if List.mem h l2 then lunion t l2 else h::(lunion t l2)
+;;
+
+let rec free_vars tm = match tm with
+    TmTrue ->
+      []
+  | TmFalse ->
+      []
+  | TmIf (t1, t2, t3) ->
+      lunion (lunion (free_vars t1) (free_vars t2)) (free_vars t3)
+  | TmZero ->
+      []
+  | TmSucc t ->
+      free_vars t
+  | TmPred t ->
+      free_vars t
+  | TmIsZero t ->
+      free_vars t
+  | TmVar s ->
+      [s]
+  | TmAbs (s, _, t) ->
+      ldif (free_vars t) [s]
+  | TmApp (t1, t2) ->
+      lunion (free_vars t1) (free_vars t2)
+  | TmLetIn (s, t1, t2) ->
+      lunion (ldif (free_vars t2) [s]) (free_vars t1)
+  | TmFix t ->
+      free_vars t
+  | TmString _ ->
+      []
+  | TmConcat (t1, t2) ->
+      lunion (free_vars t1) (free_vars t2)
+  | TmChar _ ->
+      []
+  | TmFirst t ->
+      free_vars t
+  | TmSub t ->
+      free_vars t
+  | TmTuple fields -> 
+      List.fold_left (fun fv ti -> lunion (free_vars ti) fv) [] fields    
+  | TmRecord t ->
+    let rec aux list = match list with
+      | (i, h)::[] -> free_vars h
+      | (i, h)::t -> lunion (free_vars h) (aux t)
+      | [] -> []
+    in aux t
+  | TmProj (t, s) ->
+    (match t with
+      TmTuple fields -> 
+        (try let element = List.nth fields (int_of_string s - 1) in free_vars element with 
+          _ -> 
+            raise (Type_error ("Index " ^ s ^ " not found (term)")))
+      | TmRecord fields ->
+        (try let element = List.assoc s fields in free_vars element with
+          _ ->
+            raise (Type_error ("Label " ^ s ^ " not found (term)")))
+      | _ -> 
+        raise(Type_error("Unexpected type of term")))
+
+  | TmLabel (_, t, _) -> free_vars t
+  | TmCase (tmlabel, tmcases) -> 
+    let rec traverse list out = match list with
+    | [] -> out
+    | [(_, _, term) :: []] -> traverse [] (out @ free_vars term)
+    | [(_, _, term) :: tail] -> traverse [tail] (out @ free_vars term)
+    | _ -> raise (Type_error "This should happend, right? (2)")
+    in (free_vars tmlabel) @ (traverse [tmcases] [])
+    
+  (* LISTS *) 
+  | TmEmptyList ty -> []
+  | TmList (ty,t1,t2) -> lunion (free_vars t1) (free_vars t2)
+  | TmIsEmpty (ty,t) -> free_vars t
+  | TmHead (ty,t) -> free_vars t
+  | TmTail (ty,t) -> free_vars t    
+;;
+
+let rec fresh_name x l =
+  if not (List.mem x l) then x else fresh_name (x ^ "'") l
+;;
+
+let rec subst x s tm = match tm with
+    TmTrue ->
+      TmTrue
+  | TmFalse ->
+      TmFalse
+  | TmIf (t1, t2, t3) ->
+      TmIf (subst x s t1, subst x s t2, subst x s t3)
+  | TmZero ->
+      TmZero
+  | TmSucc t ->
+      TmSucc (subst x s t)
+  | TmPred t ->
+      TmPred (subst x s t)
+  | TmIsZero t ->
+      TmIsZero (subst x s t)
+  | TmVar y ->
+      if y = x then s else tm
+  | TmAbs (y, tyY, t) ->
+      if y = x then tm
+      else let fvs = free_vars s in
+           if not (List.mem y fvs)
+           then TmAbs (y, tyY, subst x s t)
+           else let z = fresh_name y (free_vars t @ fvs) in
+                TmAbs (z, tyY, subst x s (subst y (TmVar z) t))
+  | TmApp (t1, t2) ->
+      TmApp (subst x s t1, subst x s t2)
+  | TmLetIn (y, t1, t2) ->
+      if y = x then TmLetIn (y, subst x s t1, t2)
+      else let fvs = free_vars s in
+           if not (List.mem y fvs)
+           then TmLetIn (y, subst x s t1, subst x s t2) 
+           else let z = fresh_name y (free_vars t2 @ fvs) in
+                TmLetIn (z, subst x s t1, subst x s (subst y (TmVar z) t2))
+  | TmFix t ->
+      TmFix (subst x s t)
+  | TmString st ->
+      TmString st
+  | TmConcat (t1, t2) ->
+      TmConcat (subst x s t1, subst x s t2)
+  | TmChar c ->
+      TmChar c
+  | TmFirst t ->
+      TmFirst (subst x s t)
+  | TmSub t ->
+      TmSub (subst x s t)
+  | TmTuple fields ->
+      TmTuple (List.map (fun t1 -> subst x s t1) fields)    
+  | TmRecord fields -> 
+    let f (li, ti) = (li, subst x s ti) in
+      TmRecord (List.map f fields)    
+  | TmProj (tm, str) ->
+    (match tm with
+      | TmTuple fields ->  subst x s tm
+      | TmRecord fields ->  subst x s tm
+      | _ ->  raise(Type_error("Tuple type expected (3)")))
+  | TmLabel (str, t, var) ->
+    TmLabel (str, subst x s t, var)
+  | TmCase (label, l) -> 
+    TmCase (subst x s label, l)
+    (* LISTS *)  
+  | TmEmptyList ty -> tm
+  | TmList (ty,t1,t2) -> TmList (ty, (subst x s t1), (subst x s t2))
+  | TmIsEmpty (ty,t) -> TmIsEmpty (ty, (subst x s t))
+  | TmHead (ty,t) -> TmHead (ty, (subst x s t))
+  | TmTail (ty,t) -> TmTail (ty, (subst x s t))
+;;
+
 let rec subtype tm1 tm2 = match (tm1, tm2) with
   (TyArr(s1, s2), TyArr(t1, t2)) ->
     ((subtype s1 t1) && (subtype s2 t2))
@@ -272,52 +426,33 @@ let rec typeof ctx tm = match tm with
           | _ -> raise (Type_error "Type invalid for invariant.")   
       in f newTy s
 
-  | TmCase (t, clist) -> 
+  | TmCase (tm_label, case_list) -> 
     let rec isVariant tm = match tm with
-      (*TmVar (s) -> isVariant (getvbinding ctx s)*)
-      | TmLabel (s, ltm, var) -> 
+      | TmVar (s) -> (try let value = getvbinding ctx s in isVariant value
+                      with _ -> raise (Type_error ("no binding type for variable " ^ s)))
+      | TmLabel (s, label_term, label_ty) -> 
+        let rec string_exists_in_list target list =
+          match list with
+            | [] -> false
+            | (str, _, _) :: tail ->  if str = target then true else string_exists_in_list target tail
 
-        let rec compareLabels labels1 labels2 =
-          match (labels1, labels2) with
-          | ([], []) -> true
-          | ((label1, _) :: rest1, (label2, _, _) :: rest2) ->
-              if label1 = label2 then
-                  compareLabels rest1 rest2  (* Labels match, check the rest of the lists *)
-              else false
-          | (_, _) -> false  (* Lists have different lengths, labels don't match *)
-
-          in let labelsMatch l1 l2 = compareLabels l1 l2 in
-            let getVarList lty = match (gettbinding ctx lty) with 
-              | TyVariant (tylist) -> tylist 
-              | _ -> raise (Type_error "I'm kinda lost.")
-
-            in if (labelsMatch (getVarList var) clist) == true 
-              then 
-
-                (* Find the variable of the correct case *)
-                let rec auxFindLabel labels = match labels with
-                  | [] -> None
-                  | (label, varname, term) :: tail ->
-                      if label = s then Some varname
-                      else auxFindLabel tail  (* Check the rest of the list *)
+        in  if (string_exists_in_list s case_list) == true   
+            then  let rec auxFindLabel labels = match labels with (* Find the variable of the correct case *)
+                    | [] -> None
+                    | (label, varname, term) :: tail ->
+                      if label = s then Some (label, varname, term)
+                      else auxFindLabel tail
+                  in let findLabel c_list = match auxFindLabel c_list with
+                        | Some (r_label, r_varname, r_term) ->
+                              let correct_term = subst r_varname label_term r_term in 
+                                typeof ctx correct_term
+                        | None -> raise (Type_error "No matching label found in cases.")
+                      in findLabel case_list
                 
-                in let findLabel tarlist = match auxFindLabel tarlist with
-                  | Some result -> (* result should be of type string *)
-                    ( try 
-                        let ftype = typeof ctx t in 
-                          let tyTm = typeof ctx t in 
-                          (* addbinding ctx result tyTm ltm; *)
-                          ftype
-                      with _ -> raise (Type_error "No binding here")
-                    )
-                  | None -> raise (Type_error "No matching label found in cases.")
-                
-                in findLabel clist
-                
-              else raise (Type_error "Cases don't align with the possible labels of variable.")
+            else raise (Type_error "Cases don't align with the possible labels of variable.")
 
-    | _ -> raise (Type_error "Variable for case must be an invariant.")
-    in isVariant t    
+      | _ -> raise (Type_error "Variable for case must be an invariant.")
+    in isVariant tm_label   
 
   (* LISTAS *)
   | TmEmptyList ty -> TyList (ty)
@@ -399,13 +534,21 @@ let rec string_of_term = function
     "p(" ^ s ^ ")" ^ "of" ^ string_of_term t
   | TmLabel (s, t, _) ->
     "<" ^ s ^ " : " ^ string_of_term t ^ ">"
+
   | TmCase (label, cases) -> 
-    let rec traverse list out = match list with
-      [] -> out
-    | [(l, t, term) :: []] -> traverse [] (out ^ "\n-: <" ^ l ^ "=" ^ t ^"> => " ^ string_of_term term)
-    | [(l, t, term) :: tail] -> traverse [tail] (out ^ "\n-: <" ^ l ^ "=" ^ t ^"> => " ^ string_of_term term)
-    | _ -> raise (Type_error "This should happend, right? (1)")
-    in "case " ^ string_of_term label ^ " of" ^ (traverse [cases] "")
+    let label' = match label with
+      | TmLabel (s, t, _) -> s
+      | _ -> raise (Type_error "I wanna go home")
+    in let rec traverse list = match list with
+    | [] -> raise (Type_error "Run through every label, no matches detected.")
+    | [(l, _, term)] -> if l == label' 
+                          then term
+                          else traverse []
+    | (l, _, term) :: tail -> if l == label' 
+                                then term
+                                else traverse tail
+    in string_of_term label ^ " => " ^ string_of_term (traverse cases)
+
     (* LISTS *)
   | TmEmptyList ty -> "[]"
   | TmList (ty,h,t) -> 
@@ -424,159 +567,6 @@ let rec string_of_term = function
       | TmList(ty,h,t) -> string_of_term h ^ ", " ^ string_of_list t
       | t -> string_of_term t
     in "Tail: [" ^ string_of_list t ^ "]"
-;;
-
-let rec ldif l1 l2 = match l1 with
-    [] -> []
-  | h::t -> if List.mem h l2 then ldif t l2 else h::(ldif t l2)
-;;
-
-let rec lunion l1 l2 = match l1 with
-    [] -> l2
-  | h::t -> if List.mem h l2 then lunion t l2 else h::(lunion t l2)
-;;
-
-let rec free_vars tm = match tm with
-    TmTrue ->
-      []
-  | TmFalse ->
-      []
-  | TmIf (t1, t2, t3) ->
-      lunion (lunion (free_vars t1) (free_vars t2)) (free_vars t3)
-  | TmZero ->
-      []
-  | TmSucc t ->
-      free_vars t
-  | TmPred t ->
-      free_vars t
-  | TmIsZero t ->
-      free_vars t
-  | TmVar s ->
-      [s]
-  | TmAbs (s, _, t) ->
-      ldif (free_vars t) [s]
-  | TmApp (t1, t2) ->
-      lunion (free_vars t1) (free_vars t2)
-  | TmLetIn (s, t1, t2) ->
-      lunion (ldif (free_vars t2) [s]) (free_vars t1)
-  | TmFix t ->
-      free_vars t
-  | TmString _ ->
-      []
-  | TmConcat (t1, t2) ->
-      lunion (free_vars t1) (free_vars t2)
-  | TmChar _ ->
-      []
-  | TmFirst t ->
-      free_vars t
-  | TmSub t ->
-      free_vars t
-  | TmTuple fields -> 
-      List.fold_left (fun fv ti -> lunion (free_vars ti) fv) [] fields    
-  | TmRecord t ->
-    let rec aux list = match list with
-      | (i, h)::[] -> free_vars h
-      | (i, h)::t -> lunion (free_vars h) (aux t)
-      | [] -> []
-    in aux t
-  | TmProj (t, s) ->
-    (match t with
-      TmTuple fields -> 
-        (try let element = List.nth fields (int_of_string s - 1) in free_vars element with 
-          _ -> 
-            raise (Type_error ("Index " ^ s ^ " not found (term)")))
-      | TmRecord fields ->
-        (try let element = List.assoc s fields in free_vars element with
-          _ ->
-            raise (Type_error ("Label " ^ s ^ " not found (term)")))
-      | _ -> 
-        raise(Type_error("Unexpected type of term")))
-
-  | TmLabel (_, t, _) -> free_vars t
-  | TmCase (tmlabel, tmcases) -> 
-    let rec traverse list out = match list with
-    | [] -> out
-    | [(_, _, term) :: []] -> traverse [] (out @ free_vars term)
-    | [(_, _, term) :: tail] -> traverse [tail] (out @ free_vars term)
-    | _ -> raise (Type_error "This should happend, right? (2)")
-    in (free_vars tmlabel) @ (traverse [tmcases] [])
-    
-  (* LISTS *) 
-  | TmEmptyList ty -> []
-  | TmList (ty,t1,t2) -> lunion (free_vars t1) (free_vars t2)
-  | TmIsEmpty (ty,t) -> free_vars t
-  | TmHead (ty,t) -> free_vars t
-  | TmTail (ty,t) -> free_vars t    
-;;
-
-let rec fresh_name x l =
-  if not (List.mem x l) then x else fresh_name (x ^ "'") l
-;;
-
-let rec subst x s tm = match tm with
-    TmTrue ->
-      TmTrue
-  | TmFalse ->
-      TmFalse
-  | TmIf (t1, t2, t3) ->
-      TmIf (subst x s t1, subst x s t2, subst x s t3)
-  | TmZero ->
-      TmZero
-  | TmSucc t ->
-      TmSucc (subst x s t)
-  | TmPred t ->
-      TmPred (subst x s t)
-  | TmIsZero t ->
-      TmIsZero (subst x s t)
-  | TmVar y ->
-      if y = x then s else tm
-  | TmAbs (y, tyY, t) ->
-      if y = x then tm
-      else let fvs = free_vars s in
-           if not (List.mem y fvs)
-           then TmAbs (y, tyY, subst x s t)
-           else let z = fresh_name y (free_vars t @ fvs) in
-                TmAbs (z, tyY, subst x s (subst y (TmVar z) t))
-  | TmApp (t1, t2) ->
-      TmApp (subst x s t1, subst x s t2)
-  | TmLetIn (y, t1, t2) ->
-      if y = x then TmLetIn (y, subst x s t1, t2)
-      else let fvs = free_vars s in
-           if not (List.mem y fvs)
-           then TmLetIn (y, subst x s t1, subst x s t2) 
-           else let z = fresh_name y (free_vars t2 @ fvs) in
-                TmLetIn (z, subst x s t1, subst x s (subst y (TmVar z) t2))
-  | TmFix t ->
-      TmFix (subst x s t)
-  | TmString st ->
-      TmString st
-  | TmConcat (t1, t2) ->
-      TmConcat (subst x s t1, subst x s t2)
-  | TmChar c ->
-      TmChar c
-  | TmFirst t ->
-      TmFirst (subst x s t)
-  | TmSub t ->
-      TmSub (subst x s t)
-  | TmTuple fields ->
-      TmTuple (List.map (fun t1 -> subst x s t1) fields)    
-  | TmRecord fields -> 
-    let f (li, ti) = (li, subst x s ti) in
-      TmRecord (List.map f fields)    
-  | TmProj (tuple, str) ->
-    (match typeof emptyctx tuple with
-      TyTuple fields ->  subst x s tuple
-      | _ ->  raise(Type_error("Tuple type expected (3)")))
-  | TmLabel (str, t, var) ->
-    TmLabel (str, subst x s t, var)
-  | TmCase (label, l) -> 
-    TmCase (subst x s label, l)
-    (* LISTS *)  
-  | TmEmptyList ty -> tm
-  | TmList (ty,t1,t2) -> TmList (ty, (subst x s t1), (subst x s t2))
-  | TmIsEmpty (ty,t) -> TmIsEmpty (ty, (subst x s t))
-  | TmHead (ty,t) -> TmHead (ty, (subst x s t))
-  | TmTail (ty,t) -> TmTail (ty, (subst x s t))
 ;;
 
 let rec isnumericval tm = match tm with
@@ -759,14 +749,19 @@ let rec eval1 ctx tm = match tm with
     in f var' s
 
   | TmCase (label, cases) ->
-    let tlabel = eval1 ctx label in
-    let extracted_label = match tlabel with TmLabel (l, _, _) -> l | _ -> raise (Type_error "No label found.") in
+    let label' = eval1 ctx label in
+    let extracted_label = match label' with TmLabel (l, _, _) -> l | _ -> raise (Type_error "No label found.") in
+    (*let extracted_value = match label' with TmLabel (_, tm, _) -> eval1 ctx tm | _ -> raise (Type_error "No term found.") in*)
     let rec traverse list = match list with
-      [] -> raise (Type_error "Run through every label, no matches detected.")
-    | [(l, t, term) :: []] -> if l == extracted_label then eval1 ctx term else traverse []
-    | [(l, t, term) :: tail] -> if l == extracted_label then eval1 ctx term else traverse [tail]
-    | _ -> raise (Type_error "This should happend, right? (3)")
-    in traverse [cases]
+        | [] -> raise (Type_error "Run through every label, no matches detected.")
+        | [(l, t, term)] -> if l == extracted_label 
+                                    then term
+                                    else traverse []
+        | (l, t, term) :: tail -> if l == extracted_label 
+                                    (*then eval1 ctx (subst t extracted_value term)*)
+                                    then term
+                                    else traverse tail
+    in traverse cases
 
     (*E-Cons2*)
   | TmList(ty,h,t) when isval h -> TmList(ty,h,(eval1 ctx t))
