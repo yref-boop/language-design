@@ -153,16 +153,18 @@ let rec print_type = function
     open_box 1;
     print_atomic_type t1;
     close_box();
-    print_string "->";
+    print_string " ->";
     print_space ();
     open_box 1;
     print_type t2;
     close_box ();
     ()
   | TyList ty ->
-    print_string "List";
+    print_string "List ";
     open_box 1;
+    print_char '[';
     print_type ty;
+    print_char ']';
     close_box ();
     ()
   | ty -> print_atomic_type ty;
@@ -217,6 +219,29 @@ and print_atomic_type = function
       close_box ();
       print_char '}';
         ()
+  | TyVariant l ->
+      let rec aux = function
+        [] -> ()
+        | (st, ty) :: [] ->
+            print_string st;
+            print_string " : ";
+            print_type ty;
+            ()
+        | (st, ty) :: t ->
+            print_string st;
+            print_string " : ";
+            print_type ty;
+            print_char ',';
+            print_space ();
+            aux t;
+      in
+        print_char '<';
+        open_box 1;
+        aux l;
+        close_box ();
+        print_char '>';
+
+
   (* TODO: polimoric types fall here on loop *)
   | ty ->
     print_char '(';
@@ -505,6 +530,42 @@ let rec print_term =
         print_projection t2;
       close_box ();
       ()
+    | TmList (_, _, _) as tm ->
+        let print_cons  =
+          let rec aux = function
+            | TmList (_, t1, TmEmptyList _) ->
+                print_projection t1;
+                ()
+            | TmList (_, t1, t2) ->
+                print_projection t1;
+                print_char ',';
+                print_space ();
+                aux t2
+            | t ->
+              print_projection t
+          in function
+               TmEmptyList ty ->
+                print_string "[]";
+                ()
+            | TmList (ty, t1, TmEmptyList _) ->
+                print_char '[';
+                open_box 1;
+                  print_projection t1;
+                close_box ();
+                ()
+            | TmList (ty, _, _) as t ->
+                print_char '[';
+                open_box 1;
+                  aux t;
+                close_box ();
+                print_char ']';
+                ()
+            | t ->
+                print_projection t;
+                ()
+        in
+          print_cons tm;
+          ()
     | TmIsEmpty (ty, t) ->
       print_string "isEmpty";
       print_cut ();
@@ -537,6 +598,15 @@ let rec print_term =
       open_box 1;
         print_projection t;
       close_box ();
+      ()
+    | TmLabel (st1, tm, st2) ->
+      print_char '<';
+      print_string st1;
+      print_string " = ";
+      open_box 1;
+        print_term tm;
+      close_box ();
+      print_char '>';
       ()
     | tm -> print_projection tm; ()
 
@@ -618,6 +688,7 @@ let rec print_term =
     (*atomic values*)
   and print_atomic = function
     TmTrue -> print_string "true"; ()
+    | TmChar c -> print_char c; ()
     | TmFalse -> print_string "false"; ()
     | TmZero -> print_char '0'; ()
     | TmVar s -> print_string s; ()
@@ -634,6 +705,7 @@ let rec print_term =
           ()
       in f 1 t
     | TmString s -> print_string s; ()
+    | TmEmptyList t -> print_string "[]"; ()
     | TmRecord [] -> print_string "{}"; ()
     (* TODO: polimorfic types fall here on loop*)
     | tm ->
