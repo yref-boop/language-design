@@ -28,9 +28,12 @@ type token =
   | RSQUARE
   | LCURLY
   | RCURLY
+  | LTRIFORCE
+  | RTRIFORCE
   | COMMA
   | DOT
   | EQ
+  | AS
   | COLON
   | ARROW
   | EOF

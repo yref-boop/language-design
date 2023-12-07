@@ -38,6 +38,8 @@ rule token = parse
   | "Type"      { TYPE }
   | '('         { LPAREN }
   | ')'         { RPAREN }
+  | '<'         { LTRIFORCE }
+  | '>'         { RTRIFORCE }
   | '{'         { LCURLY }
   | '}'         { RCURLY }
   | '['         { LSQUARE }
@@ -45,6 +47,7 @@ rule token = parse
   | ','         { COMMA }
   | '.'         { DOT }
   | '='         { EQ }
+  | "as"        { AS }
   | ':'         { COLON }
   | "->"        { ARROW }
   | ['0'-'9']+  { INTV (int_of_string (Lexing.lexeme lexbuf)) }

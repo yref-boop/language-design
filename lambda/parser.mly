@@ -32,9 +32,12 @@
 %token RSQUARE
 %token LCURLY
 %token RCURLY
+%token LTRIFORCE
+%token RTRIFORCE
 %token COMMA
 %token DOT
 %token EQ
+%token AS
 %token COLON
 %token ARROW
 %token EOF
@@ -103,6 +106,8 @@ appTerm :
       { TmSub $2 }    
   | appTerm pathTerm
       { TmApp ($1, $2) }
+  | LTRIFORCE IDV EQ term RTRIFORCE AS IDT
+      { TmLabel ($2, $4, $7)}      
   | LISTV LSQUARE ty RSQUARE pathTerm pathTerm
      { TmList ($3,$5,$6) }
   | ISEMPTY LSQUARE ty RSQUARE pathTerm
@@ -179,14 +184,16 @@ atomicTy :
       { TyString }
   | CHAR
       { TyChar }  
-  | TUPLE LCURLY tupleTypes RCURLY
-      { TyTuple ($3) }   
+  | LCURLY tupleTypes RCURLY
+      { TyTuple ($2) }   
   | LCURLY RCURLY
       { TyRecord ([]) }
-  | RECORD LCURLY recordTypes RCURLY
-      { TyRecord ($3) }
-  | LIST LSQUARE ty RSQUARE
-      { TyList ($3) }
+  | LCURLY recordTypes RCURLY
+      { TyRecord ($2) }
+  | LSQUARE ty RSQUARE
+      { TyList ($2) }
+  | LTRIFORCE variantTypes RTRIFORCE
+      { TyVariant ($2) }
   | IDT
       { TyCustom ($1)}
 
@@ -201,3 +208,9 @@ recordTypes :
     {[($1, $3)]}
   | IDV EQ ty COMMA recordTypes
     {($1, $3) :: $5}
+
+variantTypes :
+    IDV COLON ty
+        {[($1, $3)]}
+  | IDV COLON ty COMMA variantTypes
+        {($1, $3) :: $5}     
