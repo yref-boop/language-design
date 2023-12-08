@@ -64,15 +64,15 @@ s :
     IDV EQ term EOF
       { BindTm ($1, $3) }
   | IDT EQ ty EOF
-      { BindTy ($1, $3) }   
+      { BindTy ($1, $3) }
   | TYPE ty EOF
-      { EvalTy ($2) }   
+      { EvalTy ($2) }
   | term EOF
       { Eval $1 }
   | LET IDV EQ term EOF
-      { BindTm ($2, TmLetIn ($2, $4, TmVar $2)) } 
-  | LETREC IDV COLON ty EQ term EOF   
-      { BindTm ($2, TmLetIn ($2, TmFix (TmAbs ($2, $4, $6)), TmVar $2)) }     
+      { BindTm ($2, TmLetIn ($2, $4, TmVar $2)) }
+  | LETREC IDV COLON ty EQ term EOF
+      { BindTm ($2, TmLetIn ($2, TmFix (TmAbs ($2, $4, $6)), TmVar $2)) }
 
 term :
     appTerm
@@ -85,7 +85,6 @@ term :
       { TmLetIn ($2, $4, $6) }
   | LETREC IDV COLON ty EQ term IN term
       { TmLetIn ($2, TmFix (TmAbs ($2, $4, $6)), $8) }
-         
 
 appTerm :
     pathTerm
@@ -97,17 +96,17 @@ appTerm :
   | ISZERO pathTerm
       { TmIsZero $2 }
   | CONCAT pathTerm pathTerm
-      { TmConcat ($2, $3) } 
+      { TmConcat ($2, $3) }
   | FIX pathTerm
       { TmFix $2 }
   | FIRST pathTerm
       { TmFirst $2 }
   | SUB pathTerm
-      { TmSub $2 }    
+      { TmSub $2 }
   | appTerm pathTerm
       { TmApp ($1, $2) }
   | LTRIFORCE IDV EQ term RTRIFORCE AS IDT
-      { TmLabel ($2, $4, $7)}      
+      { TmLabel ($2, $4, $7)}
   | LISTV LSQUARE ty RSQUARE pathTerm pathTerm
      { TmList ($3,$5,$6) }
   | ISEMPTY LSQUARE ty RSQUARE pathTerm
@@ -117,7 +116,7 @@ appTerm :
   | TAIL LSQUARE ty RSQUARE pathTerm
      { TmTail ($3,$5) }
   | NULL LSQUARE ty RSQUARE
-     { TmEmptyList ($3) }    
+     { TmEmptyList ($3) }
 
 pathTerm :
     pathTerm DOT IDV
@@ -154,11 +153,11 @@ atomicTerm :
   | LCURLY RCURLY
       {TmRecord []}
 
-tupleFields : 
-  term 
+tupleFields :
+  term
     {[$1]}
   | term COMMA tupleFields
-    {$1 :: $3}      
+    {$1 :: $3}
 
 recordFields :
   IDV EQ term
@@ -169,7 +168,7 @@ recordFields :
 
 ty :
     atomicTy
-      { $1 }   
+      { $1 }
   | atomicTy ARROW ty
       { TyArr ($1, $3) }
 
@@ -183,9 +182,9 @@ atomicTy :
   | STRING
       { TyString }
   | CHAR
-      { TyChar }  
+      { TyChar }
   | LCURLY tupleTypes RCURLY
-      { TyTuple ($2) }   
+      { TyTuple ($2) }
   | LCURLY RCURLY
       { TyRecord ([]) }
   | LCURLY recordTypes RCURLY
@@ -197,20 +196,20 @@ atomicTy :
   | IDT
       { TyCustom ($1)}
 
-tupleTypes : 
-  ty 
+tupleTypes :
+  ty
     {[$1]}
   | ty COMMA tupleTypes
-    {$1 :: $3}  
+    {$1 :: $3}
 
-recordTypes : 
-    IDV EQ ty 
+recordTypes :
+    IDV COLON ty
     {[($1, $3)]}
-  | IDV EQ ty COMMA recordTypes
+  | IDV COLON ty COMMA recordTypes
     {($1, $3) :: $5}
 
 variantTypes :
     IDV COLON ty
         {[($1, $3)]}
   | IDV COLON ty COMMA variantTypes
-        {($1, $3) :: $5}     
+        {($1, $3) :: $5}
