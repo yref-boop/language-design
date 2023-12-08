@@ -1,5 +1,9 @@
-true
-let x = true in x
+################################################################################
+INITIAL EXAMPLES
+################################################################################
+
+true;;
+let x = true in x;;
 if false then true else false
 0
 succ (succ (succ 0))
@@ -10,19 +14,18 @@ if iszero 3 then 0 else 1
 iszero true
 if 1 then true else false
 if iszero 3 then 0 else false
-let id = Lx.x in id 3
 let id_bool = L x:Bool. x in id_bool true
 let id_nat = L x:Nat. x in id_nat 5
 let x = 5 in let id_nat = L x:Nat. x in id_nat x
-let fix = lambda f.(lambda x. f (lambda y. x x y)) (lambda x. f (lambda y. x x y)) in let sumaux = lambda f. (lambda n. (lambda m. if (iszero n) then m else succ (f (pred n) m))) in let sum = fix sumaux in sum 21 34
-let fix = lambda f.(lambda x. f (lambda y. x x y)) (lambda x. f (lambda y. x x y)) in let sumaux = lambda f. (lambda n. (lambda m. if (iszero n) then m else succ (f (pred n) m))) in let sum = fix sumaux in let prodaux = lambda f. (lambda n. (lambda m. if (iszero m) then 0 else sum n (f n (pred m)))) in let prod = fix prodaux in prod 12 5
+
+
+################################################################################
+RECURSION
+################################################################################
 
 x = letrec sum : Nat -> Nat -> Nat =
   lambda n : Nat. lambda m : Nat. if iszero n then m else (succ (sum (pred n) m))
 in sum;;
-
-let id = L x:Nat. x;;
-
 
 letrec sum: Nat -> Nat -> Nat =
     lambda n : Nat. lambda m : Nat. 
@@ -31,7 +34,7 @@ letrec sum: Nat -> Nat -> Nat =
 ;;
 in
 
-letrec prod: Nat -> Nat -> Nat =
+letrec prod : Nat -> Nat -> Nat =
     lambda n : Nat. lambda m : Nat.
     if iszero n then 0 
     else
@@ -43,9 +46,7 @@ letrec fact: Nat -> Nat -> Nat =
     lambda n : Nat. lambda m : Nat.
     if iszero m then 1 
     else prod n (fact n (pred m))
-in fact 2 6;
-
-
+in fact 2 6;;
 
 letrec sum: Nat -> Nat -> Nat =
     lambda n : Nat. lambda m : Nat. 
@@ -59,10 +60,12 @@ letrec fib: Nat -> Nat =
     else 
     	if iszero (pred n) then 1
 	else sum (fib (pred n)) (fib (pred (pred n)))
-in fib 5;
+in fib 5;;
 
 
-PRETTY PRINTER ================================================================
+###############################################################################
+PRETTY PRINTER
+###############################################################################
 
 ORIGINAL VERSION:
   >> letrec sum : Nat -> Nat -> Nat =
@@ -71,29 +74,11 @@ ORIGINAL VERSION:
 
   sum : (Nat) -> ((Nat) -> (Nat)) = (lambda n:Nat. (lambda m:Nat. if (iszero (n)) then (m) else (succ ((((fix (lambda sum:(Nat) -> ((Nat) -> (Nat)). (lambda n:Nat. (lambda m:Nat. if (iszero (n)) then (m) else (succ (((sum pred (n)) m))))))) pred (n)) m)))))
 
-let in : (Nat -> Nat) Nat =
-  lambda f : (Nat -> Nat). lambda x : Nat.
-  f x 1
-;;
 
-pretty-printer I
-  >> letrec sum : Nat -> Nat -> Nat =
-    lambda n : Nat. lambda m : Nat. if iszero n then m else (succ (sum (pred n) m))
-  ;;
-
-  sum : Nat -> Nat -> Nat = 
-  (lambda n:Nat. 
-  (lambda m:Nat. if (iszero (n)) then (m) else (succ ((((fix 
-  (lambda sum:Nat -> Nat -> Nat. 
-  (lambda n:Nat. 
-  (lambda m:Nat. if (iszero (n)) then (m) else (succ (((sum pred (n)) m))))))) pred (n)) m)))))
-
-pretty-printer OBJETIVE
-
+PRETTY-PRINTER IMPLEMENTED:
     >> letrec sum : Nat -> Nat -> Nat =
         lambda n : Nat. lambda m : Nat. if iszero n then m else (succ (sum (pred n) m))
     ;;
-
 
 sum : Nat-> Nat-> Nat =
  lambda n:Nat.
@@ -107,7 +92,8 @@ sum : Nat-> Nat-> Nat =
         (pred n))
        m)
 
-TERMS INNER STRUCTURE:
+
+TERMS INNER STRUCTURE ANALYSIS:
 
 inner terms:
   TmAbs(TmAbs(TmAbs(TmIf((TmIsZero(TmVar)),(TmVar),(TmSucc(TmApp(TmApp(TmFix(TmAbs(TmAbs(TmAbs(TmIf((TmIsZero(TmVar)),(TmVar),(TmSucc(TmApp(TmApp((TmVar),(TmPred(TmVar)))),TmVar)))))))),(TmPred(TmVar)),TmVar)))))))
@@ -142,3 +128,122 @@ schema:
              TmPred       pred            *()
               TmVar        n
             TmVar         m
+
+
+################################################################################
+GLOBAL CONTEXT
+################################################################################
+>> x = 1;;
+x : Nat = 1
+
+>> N = Nat;;
+N : type = Nat
+
+
+################################################################################
+STRING
+################################################################################
+>> concat "hello " "world";;
+- : String = hello world
+
+>> 'a';;
+- : Char = a
+
+>> first "Ocaml";;
+- : Char = O
+
+>> sub "Ocaml";;
+- : String = caml
+
+
+################################################################################
+TUPLES
+################################################################################
+>> {1,2,3};;
+- : {Nat, Nat, Nat} = {1, 2, 3}
+
+
+################################################################################
+REGISTERS
+################################################################################
+>> {x=1, y=2, z=3};;
+- : {x=Nat, y=Nat, z=Nat} = {x=1, y=2, z=3}
+
+>> {};;
+- : {} = {}
+
+
+################################################################################
+VARIANTS
+################################################################################
+>> Int = <pos:Nat, zero:Bool, neg:Nat>;;
+Int : type = <pos : Nat, zero : Bool, neg : Nat>
+
+>> p3 = <pos=3> as Int;;
+p3 : <pos : Nat, zero : Bool, neg : Nat> = <pos = 3>
+
+
+################################################################################
+LISTS
+################################################################################
+
+(L x:{}. 1) {1};;
+(L x:{x:Nat}. x.x) {x=1,y=2};;
+(L x:{x:Nat}. x.x) {x=1,y=2,z=3}$
+
+let fx = (lambda r : {x : Nat}. r.x) {x=0};;
+
+null[Nat];;
+
+lst = l.[Nat] 1 (l.[Nat] 2 (l.[Nat] 3 (l.[Nat] 4 (null[Nat]))));;
+
+head[Nat] lst;;
+
+lst2 = l.[Nat] 5 (l.[Nat] 6 (l.[Nat] 7 (l.[Nat] 8 (null[Nat]))));;
+
+tail[Nat] lst2;;
+
+letrec len : ([Nat]) -> Nat = lambda l : [Nat]. if (isEmpty[Nat] l) then 0 else (succ (len (tail[Nat] l)))
+in len lst;;
+
+f = lambda x:Nat . succ x;;
+
+letrec map : [Nat] -> (Nat -> Nat) -> [Nat] =
+lambda lst: [Nat]. lambda f: (Nat -> Nat).
+        if (isEmpty[Nat] (tail[Nat] lst)) then
+                l.[Nat] (f (head[Nat] lst)) (null[Nat])
+        else
+                l.[Nat] (f (head[Nat] lst)) (map (tail[Nat] lst) f)
+in map lst f;;
+
+letrec append: [Nat] -> [Nat] -> [Nat] =
+lambda l1: [Nat]. lambda l2: [Nat].
+        if isEmpty[Nat] l1 then
+                l2
+        else
+                l.[Nat] (head[Nat] l1) (append (tail[Nat] l1) l2)
+in append lst lst2;;
+
+
+################################################################################
+SUBTYPING
+################################################################################
+
+(* tuples do not have subtyping applied to them *)
+>> (L x:{}. 1) {1};;
+type error: parameter type mismatch
+>> (L x:{Nat}. 1) {1};;
+- : Nat = 1
+
+(* every register has {} as a supertype *)
+>> (L x:{}. 1) {};;
+- : Nat = 1
+>> (L x:{}. 1) {x=1};;
+- : Nat = 1
+
+let id = lambda r : {}. r;;
+
+(L x:{x:Nat}. x.x) {x=1,y=2};;
+(L x:{x:Nat}. x.x) {x=1,y=2,z=3};;
+
+f = lambda r:({}->Nat). r;;
