@@ -1,8 +1,0 @@
-
-nuevo tipo, Command, que ira por encima del Term
-nuevo almacenamiento de contexto para soportar tambien guardado de terminos
-nuevo tipo de dato binding para guardar bien solo ipo o tipo y termino del contexto
-funciones:
-	añadir tipo y termino
-	busucar asocieado tipo en el context
-	buscar asociado valor en el contexto
