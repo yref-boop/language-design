@@ -896,10 +896,8 @@ let rec subst x s tm = match tm with
   | TmRecord fields -> 
     let f (li, ti) = (li, subst x s ti) in
       TmRecord (List.map f fields)    
-  | TmProj (tuple, str) ->
-    (match typeof emptyctx tuple with
-      TyTuple fields ->  subst x s tuple
-      | _ ->  raise(Type_error("Tuple type expected (3)")))
+  | TmProj (field, str) ->  
+      TmProj(subst x s field, str)
   | TmLabel (str, t, var) ->
     TmLabel (str, subst x s t, var)
     (* LISTS *)
@@ -1072,7 +1070,8 @@ let rec eval1 ctx tm = match tm with
     _ -> raise NoRuleApplies)
 
   | TmProj (TmRecord list as v, s) when isval v ->
-    List.assoc s list
+    (try List.assoc s list with
+    _ -> raise NoRuleApplies)
 
   | TmProj (t1, lb) ->
     let t1' = eval1 ctx t1 in

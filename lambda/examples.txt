@@ -139,6 +139,9 @@ x : Nat = 1
 >> N = Nat;;
 N : type = Nat
 
+>> type Nat;; # it works with type alias
+- : type = Nat
+
 
 ################################################################################
 STRING
@@ -162,6 +165,10 @@ TUPLES
 >> {1,2,3};;
 - : {Nat, Nat, Nat} = {1, 2, 3}
 
+>> (L x:{}. 1) {};;
+>> (L x:{Nat}. x.1) {1};;
+
+>> let f = lambda x:{Nat, Nat}. x.1 in f {1, 2};;
 
 ################################################################################
 REGISTERS
@@ -172,6 +179,10 @@ REGISTERS
 >> {};;
 - : {} = {}
 
+>> (L x:{a:Nat, b:Nat}. x) {a=1, b=2};;
+>> (L x:{a:Nat, b:Nat}. x.a) {a=1, b=2};;
+
+>> let fa = lambda x:{a:Nat, b:Nat}. x.a in fa {a=1, b=2};;
 
 ################################################################################
 VARIANTS
@@ -186,12 +197,6 @@ p3 : <pos : Nat, zero : Bool, neg : Nat> = <pos = 3>
 ################################################################################
 LISTS
 ################################################################################
-
-(L x:{}. 1) {1};;
-(L x:{x:Nat}. x.x) {x=1,y=2};;
-(L x:{x:Nat}. x.x) {x=1,y=2,z=3}$
-
-let fx = (lambda r : {x : Nat}. r.x) {x=0};;
 
 null[Nat];;
 
@@ -247,3 +252,14 @@ let id = lambda r : {}. r;;
 (L x:{x:Nat}. x.x) {x=1,y=2,z=3};;
 
 f = lambda r:({}->Nat). r;;
+
+################################################################################
+ERROR
+################################################################################
+
+  | TmProj (tuple, str) ->
+    (match typeof emptyctx tuple with
+      TyTuple fields ->  subst x s tuple
+      | _ ->  raise(Type_error("Tuple type expected (3)")))
+  | TmProj (field, str) ->  
+      TmProj(subst x s field, str)
